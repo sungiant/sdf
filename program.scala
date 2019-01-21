@@ -220,10 +220,5 @@ object Program {
     } |> Image.create (w, h) _
   }
 
-  def main (args: Array[String]): Unit = {
-    val path = "sdf.ppm"
-    val file = new java.io.File (path)
-    file.exists match { case true => file.delete (); case false => () }
-    demo (640, 360) |> Image.toNetPBM (path) _
-  }
+  def main (args: Array[String]): Unit = demo (640, 360) |> Image.toNetPBM ("sdf.ppm") _
 }
