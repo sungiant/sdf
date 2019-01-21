@@ -5,3 +5,10 @@ This simple demo illustrates the basics of both ray marching and modelling with 
 When run the program produces this image, writing it to disk in PPM format:
 
 ![preview](https://raw.githubusercontent.com/sungiant/sdf/master/preview.png)
+
+To quickly run this program, install `sbt` (the in interactive Scala build tool), clone this reposititory and then from the root of the repository run:
+
+```
+sbt run
+```
+
