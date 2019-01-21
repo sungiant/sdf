@@ -108,12 +108,14 @@ case class Image (width: Int, height: Int, pixels: IndexedSeq[Colour]) {
 object Image {
   def create (w: Int, h: Int)(r: IndexedSeq[Colour]): Image = Image (w, h, r)
   def toNetPBM (path: String)(image: Image): Unit = {
-    val out = new java.io.DataOutputStream (new java.io.FileOutputStream (path))
+    val out = new java.io.DataOutputStream (new java.io.BufferedOutputStream (
+      java.nio.file.Files.newOutputStream (java.nio.file.Paths.get (path), java.nio.file.StandardOpenOption.CREATE)))
     out.writeBytes ("P6\u000a%d %d\u000a%d\u000a".format (image.width, image.height, 255))
     (0 until image.height)
       .flatMap { y => (0 until image.width).map { x => (x, y) } }
       .map { case (x, y) => image.get (x, y) }
       .foreach { c => out.writeByte (c.r); out.writeByte (c.g); out.writeByte (c.b) }
+      out.flush ()
   }
 }
 
@@ -198,15 +200,14 @@ object Program {
     val (y, zx) = (4.0, 6.0)
     val theta = (Math.sqrt (zx * zx * 2.0) / y) |> Math.atan
     val camera = Camera (
-      Vector (zx, y, zx),
-      Quaternion.fromYawPitchRoll (5.0 * math.Pi / 4.0, (math.Pi / 2.0) - theta, 0.0),
-      57.0, w.toDouble / h.toDouble, 0.1, 100.0)
+      position = Vector (zx, y, zx),
+      orientation = Quaternion.fromYawPitchRoll (5.0 * math.Pi / 4.0, (math.Pi / 2.0) - theta, 0.0),
+      fov = 57.0, aspect = w.toDouble / h.toDouble, near = 0.1, far = 100.0)
     (0 until h).flatMap { j =>
       (0 until w).map { i =>
         val fx = 2.0 - (2.0 * (i.toDouble + 0.5) / w.toDouble) - 1.0 // x axis: -1.0 to 1.0
         val fy = 2.0 - (2.0 * (j.toDouble + 0.5) / h.toDouble) - 1.0 // y axis: -1.0 to 1.0
         val pixelRay = camera.ray (fx, fy)
-
         val sdf = evaluate (scene).getOrElse ((_: Vector) => 0.0)
         distanceAlongRayWhenItHitsASurface (pixelRay, sdf, camera.near, camera.far) match {
           case None => Colour.black
