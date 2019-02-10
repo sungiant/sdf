@@ -34,7 +34,7 @@ object Program {
 
   // Application
   //------------------------------------------------------------------------------------------------------------------//
-  def main (args: Array[String]): Unit = demo (640*2, 360*2).foreach { case (n, i) => i |> Image.toNetPBM (s"$n.ppm") _ }
+  def main (args: Array[String]): Unit = demo (640, 360).foreach { case (n, i) => i |> Image.writePNG (s"$n.png") _ }
 
   def demo (w: Int, h: Int): List[(String, Image)] = {
     val camera   : Camera          = Scene.camera (y = 4, zx = 6, fov = 57.5, aspect = w.toDouble / h.toDouble, near = 0.1, far = 100.0) 
@@ -140,26 +140,26 @@ object Program {
         (lightingPass.diffuseValue (i) * depthPass.albedo (i)) +
         lightingPass.specularValue (i)
 
-      val shadowFactor = 0.5
+      val shadowFactor = 0.6
       val aoFactor = 0.8
 
       val shadowMultiplier = (1.0 - (1.0 - shadowPass.shadowValue (i)) * shadowFactor)
+      val shadowPenmbraMultiplier = (1.0 - (1.0 - shadowPass.stats.minimumDepthSeen (i)) * shadowFactor)
       val aoMultiplier = (1.0 - (1.0 - aoPass.occlusionValue (i)) * aoFactor)
 
-      val res = x * shadowMultiplier * aoMultiplier
+      val res = x * /*shadowMultiplier * */ aoMultiplier * shadowPenmbraMultiplier
       Colour.fromVector01 (Vector (clamp01 (res.x), clamp01 (res.y), clamp01 (res.z)))
     })
 
     //----------------------------------------------------------------------------------------------------------------//
     case class DepthPass (input: DepthPass.Input, output: DepthPass.Output, stats: DepthPass.Stats) {
-      lazy val width = input.w
-      lazy val height = input.h
+      lazy val (width, height) = (input.w, input.h)
       def surfacePosition (i: Int): Option[Vector] = output.depths (i).map (input.rays (i).position + input.rays (i).direction * _)
 
-      // Right now just hard code all objects to RED
+      // Right now just hard code all objects to WHITE
       def albedo (i: Int): Vector = output.depths (i) match {
         case None => Vector.zero
-        case Some (_) => Vector (1, 0, 0)
+        case Some (_) => Vector.one
       }
       def albedo (x: Int, y: Int): Vector = albedo (x + y * width)
     }
@@ -189,8 +189,7 @@ object Program {
 
     //----------------------------------------------------------------------------------------------------------------//
     case class NormalsPass (input: NormalsPass.Input, output: NormalsPass.Output, stats: NormalsPass.Stats) {
-      lazy val width = input.depthPass.input.w
-      lazy val height = input.depthPass.input.h
+      lazy val (width, height) = (input.depthPass.input.w, input.depthPass.input.h)
       def surfaceNormal (i: Int): Option[Vector] = output.surfaceNormals (i)
     }
     object NormalsPass {
@@ -212,8 +211,7 @@ object Program {
 
     //----------------------------------------------------------------------------------------------------------------//
     case class ShadowPass (input: ShadowPass.Input, output: ShadowPass.Output, stats: ShadowPass.Stats) {
-      lazy val width = input.depthPass.input.w
-      lazy val height = input.depthPass.input.h
+      lazy val (width, height) = (input.depthPass.input.w, input.depthPass.input.h)
       def shadowValue (i: Int): Double = output.shadowmap (i)
     }
     object ShadowPass {
@@ -229,54 +227,47 @@ object Program {
 
       def process (input: Input) = {
         val settings = Algorithm.March.Settings.default// (128, 0.001)
-        val results: IndexedSeq[(Double, Double, Int)] = (0 until input.depthPass.height * input.depthPass.width).map { i =>
+        case class Result (shadow: Double, minimumDepthSeen: Double, iterations: Int)
+        val results: IndexedSeq[Result] = (0 until input.depthPass.height * input.depthPass.width).map { i =>
           val shadowCastingLights = input.lighting.collect { case l if l.castsShadows => l }
-          //case class Aggregation ()
 
           input.depthPass.surfacePosition (i) match {
-            case None => (1.0, 1.0, 0)
-            case Some (p) => shadowCastingLights.foldLeft ((1.0, 1.0, 0)) { (a, l) =>
-              val distanceToSurface = (p - l.position).length
-              val lightToSurfaceRay = Ray (l.position, (p - l.position).normalise)
-              Algorithm.march (settings)(input.depthPass.input.sdf, 0.0, distanceToSurface - (2.0 * settings.tolerance)) (lightToSurfaceRay) match {
-                case Algorithm.March (Some (d), _, stats) =>
-                  (0.0, a._2, a._3 + stats.iterations)
-                case Algorithm.March (None, _, stats) =>
-                  val k = 128.0 * 200.0// * 1000.0
-                  val z = stats.min // * k
-                  //if (i % 1000 == 0) println (z)
-                  (a._1, Math.min (a._2, z), a._3 + stats.iterations)
-                case _ => a
-              }
+            case None => Result (1.0, 1.0, 0)
+            case Some (p) => shadowCastingLights.foldLeft (Result (1.0, 1.0, 0)) { (a, l) =>
 
+              val surfaceToLightRay = Ray (p,  (l.position - p).normalise)
+              val start = 10.0 * settings.tolerance
+              val distanceToEnd = (l.position - p).length - start
+              Algorithm.march (settings)(
+                input.depthPass.input.sdf, start, distanceToEnd) (
+                surfaceToLightRay) match {
+                
+                  case Algorithm.March (Some (d), _, stats) =>
+                    Result (0.0, 0.0, a.iterations + stats.iterations)
 
+                  case Algorithm.March (None, _, stats) =>
+                    val k = 2.0
+                    val z = stats.min * k
+                    Result (a.shadow, Math.min (a.minimumDepthSeen, clamp01 (z)), a.iterations + stats.iterations)
 
-              /*
-              val rayDir = (i.position - p).normalise
-              val rayToLight = Ray (p + rayDir * settings.tolerance * 2.0, rayDir)
-              val result = Algorithm.march (settings)(input.depthPass.input.sdf, 0.0, input.depthPass.input.camera.frustumDepth) (rayToLight)
-              result.dist match {
-                case Some (d) => (a._1 + (Colour.toVector01 (i.colour).length / shadowCastingLights.size.toDouble), a._2 + result.stats.iterations)
-                case _ => a
-              }
-              */
+                  case _ => a
+                }
             }
           }
         }
         ShadowPass (
           input,
-          Output (results.map (_._1)),
+          Output (results.map (_.shadow)),
           Stats (
-            results.map (_._2),
-            results.map (_._3),
+            results.map (_.minimumDepthSeen),
+            results.map (_.iterations),
             settings.iterationLimit))
       }
     }
 
     //----------------------------------------------------------------------------------------------------------------//
     case class AmbientOcclusionPass (input: AmbientOcclusionPass.Input, output: AmbientOcclusionPass.Output, stats: AmbientOcclusionPass.Stats) {
-      lazy val width = input.depthPass.input.w
-      lazy val height = input.depthPass.input.h
+      lazy val (width, height) = (input.depthPass.input.w, input.depthPass.input.h)
       def occlusionValue (i: Int): Double = output.aomap (i)
     }
     object AmbientOcclusionPass {
@@ -313,8 +304,7 @@ object Program {
 
     //----------------------------------------------------------------------------------------------------------------//
     case class LightingPass (input: LightingPass.Input, output: LightingPass.Output, stats: LightingPass.Stats) {
-      lazy val width = input.depthPass.input.w
-      lazy val height = input.depthPass.input.h
+      lazy val (width, height) = (input.depthPass.input.w, input.depthPass.input.h)
       def ambientValue (i: Int): Vector = output.ambient (i)
       def diffuseValue (i: Int): Vector = output.diffuse (i)
       def specularValue (i: Int): Vector = output.specular (i)
@@ -418,8 +408,8 @@ object Program {
         fov, aspect, near, far)
 
     def lighting: List[Light] =
-      Light (Vector (-1, 1.5, 5), Colour (96, 0, 96), true) ::
-      Light (Vector (6, 4, -2), Colour (128, 96, 0), false) :: Nil
+      Light (Vector (-1, 1.5, 5), Colour (112, 0, 112), true) ::
+      Light (Vector (6, 8, 2), Colour (160, 0, 0), true) :: Nil
     
     def editList: List[Edit] =
       Edit (  SDF.cube (Vector.zero,  2.0) _, CSG.Union ) ::
@@ -524,15 +514,17 @@ object Program {
   }
   object Image {
     def create (w: Int, h: Int)(r: IndexedSeq[Colour]): Image = Image (w, h, r)
-    def toNetPBM (path: String)(image: Image): Unit = {
-      import java.io._, java.nio.file._
-      val out = new DataOutputStream (new BufferedOutputStream (Files.newOutputStream (Paths.get (path), StandardOpenOption.CREATE)))
-      out.writeBytes ("P6\u000a%d %d\u000a%d\u000a".format (image.width, image.height, 255))
-      (0 until image.height)
+    def writePNG (path: String)(image: Image): Unit = {
+      import javax.imageio.ImageIO, java.awt.image.BufferedImage, java.io.File
+      val buffer = new BufferedImage (image.width, image.height, BufferedImage.TYPE_INT_RGB)
+       (0 until image.height)
         .flatMap { y => (0 until image.width).map { x => (x, y) } }
-        .map { case (x, y) => image.get (x, y) }
-        .foreach { c => out.writeByte (c.r.toByte); out.writeByte (c.g.toByte); out.writeByte (c.b.toByte) }
-      out.flush ()
+        .foreach { case (x, y) =>
+          val c = image.get (x, y)
+          val value = c.r.toInt << 16 | c.g.toInt << 8 | c.b.toInt
+          buffer.setRGB (x, y, value)
+        }
+      ImageIO.write (buffer, "png", new File (path))
     }
   }
 
