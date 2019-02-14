@@ -4,7 +4,7 @@ This simple demo illustrates the basics of both the sphere tracing method of ray
 
 When run the program produces this image (writing it to disk in PNG format):
 
-![composite](https://raw.githubusercontent.com/sungiant/sdf/master/renders/render-00-composite.png)
+![composite](/renders/render-00-composite.png)
 
 To quickly run this program, install `sbt` (the in interactive Scala build tool), clone this reposititory and then from the root of the repository run:
 
