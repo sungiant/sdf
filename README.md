@@ -1,4 +1,4 @@
-# A simple software signed distance function renderer
+# A simple signed distance function renderer
 
 This simple demo illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance fields; it has no dependencies and is around six hundred lines of functional Scala.  The renderer is written specifically to run eclusively on the CPU instead of the GPU so as to best illustate the entire rendering pipeline as clearly and concisely as possible.
 
