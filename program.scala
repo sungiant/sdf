@@ -35,8 +35,7 @@ object Program {
   def demo (w: Int, h: Int): List[(String, Image)] = {
     val camera   : Camera          = Scene.camera (y = 4, zx = 6, fov = 57.5, aspect = w.toDouble / h.toDouble, near = 0.1, far = 100.0) 
     val lighting : List[Light]     = Scene.lighting
-    val sdf      : SDF             = (Scene.editList |> Scene.evaluate).getOrElse ((_: Vector) => 0.0)
-
+    val sdf      : SDF             = Scene.edits |> CSG.evaluate
     // Render pipeline
     val depthPass         = Renderer.DepthPass (w, h, sdf, camera)
     val normalsPass       = Renderer.NormalsPass (depthPass)
@@ -65,12 +64,6 @@ object Program {
   //------------------------------------------------------------------------------------------------------------------//
   object Scene {
 
-    // Enumeration of constructive solid geometry operations
-    trait CSG; object CSG { object Intersect extends CSG; object Union extends CSG; object Difference extends CSG }
-
-    // A scene is defined as a list of edits.  TODO: convert this to a tree.
-    case class Edit (sdf: SDF, op: CSG)
-
     def camera (y: Double, zx: Double, fov: Double, aspect: Double, near: Double, far: Double): Camera = Camera (
         Vector (zx, y, zx),
         Quaternion.fromYawPitchRoll (5.0 * math.Pi / 4.0, (math.Pi / 2.0) - ((Math.sqrt (zx * zx * 2.0) / y) |> Math.atan), 0.0),
@@ -79,35 +72,67 @@ object Program {
     def lighting: List[Light] =
       Light (Vector (-1, 1.5, 5), Colour (112, 0, 112), true) ::
       Light (Vector (6, 8, 2), Colour (160, 0, 0), true) :: Nil
-    
-    def editList: List[Edit] =
-      Edit (  SDF.cube (Vector.zero,  2.0) _, CSG.Union ) ::
-      Edit (SDF.sphere (Vector.zero,  2.4) _, CSG.Intersect ) ::
-      Edit (SDF.sphere (Vector.unitX, 0.8) _, CSG.Difference) ::
-      Edit (SDF.sphere (Vector.unitY, 0.8) _, CSG.Difference) ::
-      Edit (SDF.sphere (Vector.unitZ, 0.8) _, CSG.Difference) ::
-      Edit (  SDF.cube (Vector ( 0.0 , -5.8 ,  0.0 ), 10.0) _, CSG.Union ) ::
-      Edit (  SDF.cube (Vector (-3.5 ,  0.7 , -3.5 ),  3.0) _, CSG.Union ) ::
-      Edit (  SDF.cube (Vector ( 2.0 , -0.3 , -4.5 ),  1.0) _, CSG.Union ) ::
-      Edit (  SDF.cube (Vector (-4.0 ,  0.2 ,  0.0 ),  2.0) _, CSG.Union ) ::
-      Edit (  SDF.cube (Vector (-4.5 , -0.3 ,  2.0 ),  1.0) _, CSG.Union ) ::
-      Edit (SDF.sphere (Vector ( 0.65,  0.8 , -0.65),  0.4) _, CSG.Union ) ::
-      Edit (SDF.sphere (Vector (-0.65,  0.8 , -0.65),  0.4) _, CSG.Union ) ::
-      Edit (SDF.sphere (Vector ( 0.65,  0.8 ,  0.65),  0.4) _, CSG.Union ) ::
-      Edit (SDF.sphere (Vector (-0.65,  0.8 ,  0.65),  0.4) _, CSG.Union ) :: Nil
 
-    // Folds a list of edits into an SDF.
-    def evaluate (edits: List[Edit]): Option[SDF] = edits.foldLeft (None: Option[SDF]) { (acc: Option[SDF], edit: Edit) =>
-      Some { (pos: Vector) => 
-        val b = edit.sdf (pos)
-        acc match {
-          case None => b // Ignore the first edit's op.
-          case Some (x) =>
-            val a = x (pos)
-            edit.op match {
-              case CSG.Intersect   => Math.max ( a,  b)
-              case CSG.Union       => Math.min ( a,  b)
-              case CSG.Difference  => Math.max ( a, -b) }}}
+    def edits: CSG.Tree = 
+      CSG.Tree (CSG.Op.Union,
+        CSG.Tree (CSG.Op.Difference,
+          CSG.Tree (CSG.Op.Intersection,
+            CSG.Tree (SDF.cube (Vector.zero, 2.0) _),
+            CSG.Tree (SDF.sphere (Vector.zero, 2.4) _)),
+          CSG.Tree (CSG.Op.Union,
+            CSG.Tree (SDF.sphere (Vector.unitX, 0.8) _),
+            CSG.Tree (CSG.Op.Union,
+              CSG.Tree (SDF.sphere (Vector.unitY, 0.8) _),
+              CSG.Tree (SDF.sphere (Vector.unitZ, 0.8) _)))),
+        CSG.Tree (CSG.Op.Union,
+          CSG.Tree (CSG.Op.Union,
+            CSG.Tree (CSG.Op.Union,
+              CSG.Tree (CSG.Op.Union,
+                CSG.Tree (CSG.Op.Union,
+                  CSG.Tree (CSG.Op.Union,
+                    CSG.Tree (CSG.Op.Union,
+                      CSG.Tree (CSG.Op.Union,
+                        CSG.Tree (SDF.cube (Vector (0.0, -5.8, 0.0), 10.0) _),
+                        CSG.Tree (SDF.cube (Vector (-3.5, 0.7, -3.5), 3.0) _)),
+                      CSG.Tree (SDF.cube (Vector (2.0, -0.3, -4.5 ), 1.0) _)),
+                    CSG.Tree (SDF.cube (Vector (-4.0, 0.2, 0.0 ), 2.0) _)),
+                  CSG.Tree (SDF.cube (Vector (-4.5, -0.3, 2.0 ), 1.0) _)),
+                CSG.Tree (SDF.sphere (Vector (0.65, 0.8, -0.65), 0.4) _)),
+              CSG.Tree (SDF.sphere (Vector (-0.65, 0.8, -0.65), 0.4) _)),
+            CSG.Tree (SDF.sphere (Vector (0.65, 0.8, 0.65), 0.4) _)),
+          CSG.Tree (SDF.sphere (Vector (-0.65, 0.8, 0.65), 0.4) _)))
+  }
+
+  object CSG {
+    // Enumeration of constructive solid geometry ops
+    trait Op; object Op {
+      object Union extends Op          // Merger of two objects (commutative)
+      object Intersection extends Op   // Portion common to both objects (commutative)
+      object Difference extends Op     // Subtraction of one object from another (not commutative)
+    }
+
+    type Tree = Either[Tree.Node, Tree.Leaf]
+    object Tree {
+      case class Node (value: Op, left: Tree, right: Tree)
+      case class Leaf (value: SDF)
+      def apply (value: Op, left: Tree, right: Tree): Tree = Left (Node (value, left, right))
+      def apply (value: SDF): Tree = Right (Leaf (value))
+    }
+
+    def evaluate (scene: CSG.Tree): SDF = {
+      def r (t: CSG.Tree): SDF = t match {
+        case Right (leaf) => leaf.value
+        case Left (node) => (pos: Vector) => {
+          val a = pos |> r (node.left)
+          val b = pos |> r (node.right)
+          node.value match {
+            case Op.Intersection => Math.max (a,  b)
+            case Op.Union        => Math.min (a,  b)
+            case Op.Difference   => Math.max (a, -b)
+          }
+        }
+      }
+      r (scene)
     }
   }
 
