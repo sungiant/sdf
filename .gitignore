@@ -2,3 +2,6 @@ project/
 target/
 *.ppm
 .DS_Store
+README.html
+temp.txt
+*.orig
