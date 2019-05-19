@@ -1,6 +1,7 @@
 # Sphere tracing signed distance fields
 
 [![Build Status](https://travis-ci.org/sungiant/sdf.png?branch=master)][travis]
+[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)][license]
 
 This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance fields.
 
@@ -250,6 +251,18 @@ The final image is a composition, using varied blending techniques, of the data 
 * [9-bit Science, Raymarching distance fields](http://9bitscience.blogspot.com/2013/07/raymarching-distance-fields_14.html)
 
 
+## License
+
+This software is licensed under the **[MIT License][license]**; you may not use this software except in compliance with the License.
+
+```
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
 
 [travis]: https://travis-ci.org/sungiant/sdf
+[license]: https://raw.githubusercontent.com/sungiant/sdf/master/LICENSE
 
