@@ -1,5 +1,7 @@
 # Sphere tracing signed distance fields
 
+[![Build Status](https://travis-ci.org/sungiant/sdf.png?branch=master)][travis]
+
 This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance fields.
 
 
@@ -73,7 +75,7 @@ Signed distance fields are often used in modern game engines where a discrete sa
 
 Another mechanism for constructing a queryable signed distance field is with pure algebra.
 
-...
+... ... ...
 
 The follow code snippet shows this demo's alegbraic implementations: 
 
@@ -247,4 +249,7 @@ The final image is a composition, using varied blending techniques, of the data 
 * [Alex Benton, Ray marching and signed distance fields](http://bentonian.com/Lectures/FGraphics1819/1.%20Ray%20Marching%20and%20Signed%20Distance%20Fields.pdf)
 * [9-bit Science, Raymarching distance fields](http://9bitscience.blogspot.com/2013/07/raymarching-distance-fields_14.html)
 
+
+
+[travis]: https://travis-ci.org/sungiant/sdf
 
