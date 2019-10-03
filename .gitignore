@@ -1,6 +1,7 @@
 project/
 target/
 *.ppm
+*.pbm
 .DS_Store
 README.html
 temp.txt

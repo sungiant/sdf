@@ -41,7 +41,7 @@ object Program {
 
   // Application
   //------------------------------------------------------------------------------------------------------------------//
-  def main (args: Array[String]): Unit = demo (640, 360).foreach { case (n, i) => i |> Image.writePNG (s"renders/$n.png") _ }
+  def main (args: Array[String]): Unit = demo (640, 360).foreach { case (n, i) => i |> Image.writeNetPBM (s"renders/$n.pbm") _ }
 
   def demo (w: Int, h: Int): List[(String, Image)] = {
     val camera            = Scene.createCamera (y = 4, zx = 6, fov = 57.5, aspect = w.toDouble / h.toDouble, near = 0.1, far = 100.0) 
@@ -651,19 +651,17 @@ object Program {
   }
   object Image {
     def create (w: Int, h: Int)(r: IndexedSeq[Colour]): Image = Image (w, h, r)
-    def writePNG (path: String)(image: Image): Unit = {
-      import javax.imageio.ImageIO, java.awt.image.BufferedImage, java.io.File
-      val buffer = new BufferedImage (image.width, image.height, BufferedImage.TYPE_INT_RGB)
-       (0 until image.height)
+    def writeNetPBM (path: String)(image: Image): Unit = {
+      val out = new java.io.DataOutputStream (new java.io.FileOutputStream (path))
+      out.writeBytes ("P6\u000a%d %d\u000a%d\u000a".format (image.width, image.height, 255))
+      (0 until image.height)
         .flatMap { y => (0 until image.width).map { x => (x, y) } }
-        .foreach { case (x, y) =>
-          val c = image.get (x, y)
-          val value = c.r.toInt << 16 | c.g.toInt << 8 | c.b.toInt
-          buffer.setRGB (x, y, value)
+        .map { case (x, y) => image.get (x, y) }
+        .foreach { c =>
+          out.writeByte (c.r)
+          out.writeByte (c.g)
+          out.writeByte (c.b)
         }
-      val file = new File (path)
-      file.getParentFile().mkdirs();
-      ImageIO.write (buffer, "png", file)
     }
   }
 
