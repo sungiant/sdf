@@ -12,7 +12,7 @@ When run, the program produces this image (writing it to disk in PNG format):
 
 ![composite](/renders/render-00-composite.png?raw=true)
 
-To quickly run this program, install `sbt` (the interactive Scala build tool), clone this reposititory and then from the root of the repository run:
+To quickly run this program, install `sbt` (the interactive Scala build tool), clone this repository and then from the root of the repository run:
 
 ```
 sbt run
