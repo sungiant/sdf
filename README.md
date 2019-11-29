@@ -6,7 +6,7 @@
 This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance fields.
 
 
-The renderer is written specifically to run exclusively on the CPU instead of the GPU so as to best illustate the entire rendering pipeline as clearly and concisely as possible.
+The renderer is written specifically to run exclusively on the CPU instead of the GPU so as to best illustrate the entire rendering pipeline as clearly and concisely as possible.
 
 When run, the program produces this image (writing it to disk in PNG format):
 
