@@ -35,7 +35,7 @@ The process of generating the image above is based on the combination of the fol
 
 ### Constructive Solid Geometery
 
-Constructive solid geometry is the technique of using boolean operators to combine geometrical objects, as shown below.  A practicle way to represent CSG objects is with a binary tree, where leaves represent primitives and nodes represent operations.
+Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practicle way to represent CSG objects is with a binary tree - with leaves representing primitives and nodes representing operations.
 
 <img src="/docs/csg.png" style="float: right;" />
 
@@ -43,7 +43,12 @@ The following code snippet shows how CSG is implemented within this demo:
 
 ```
 object CSG {
-  trait Op; object Op { object Union extends Op; object Intersection extends Op; object Difference extends Op }
+  trait Op
+  object Op {
+    object Union extends Op
+    object Intersection extends Op
+    object Difference extends Op
+  }
 
   type Tree = Either[Tree.Node, Tree.Leaf]
   object Tree {
@@ -62,26 +67,26 @@ Constructive solid geometry is a powerful abstraction that provides a language w
 
 ### Signed Distance Fields
 
-Given a position in 3D space, a signed distance field, as a construct, can be used to query both the distance of that point to the nearest surface and whether that point is inside or outside of the surface; the resultant value of a signed distance field query is a signed real number, the magnitude of which indicates the distance between the point and the surface, the sign indicates whether the point lies inside (negative) or outside (positive) the surface.
+Given a position in 3D space (`p`), a signed distance field, as a construct, can be used to query both the distance between `p` and the nearest surface and whether `p` is inside or outside of the surface; the resultant value of a signed distance field query is a signed real number, the magnitude of which indicates the distance between `p` and the surface, the sign indicates whether `p` lies inside (negative) or outside (positive) the surface.
 
 Signed distance fields are often used in modern game engines where a discrete sampling of points in 3D space (which may or may not be updated at runtime) is packed into a 3D texture and then used as a quantised signed distance field lookup to facilitate the implementation of fast realtime shadows.
 
-Another mechanism for constructing a queryable signed distance field is with pure algebra.  Take for example a [unit sphere](https://en.wikipedia.org/wiki/Unit_sphere), consider the values that signed distance field should return for the following input points:
+Another mechanism for constructing a queryable signed distance field is with pure algebra.  Take for example the surface of a [unit sphere](https://en.wikipedia.org/wiki/Unit_sphere) and consider the results that a signed distance field query should yield for the following input points:
 
-* `(0.0, 0.75, 0.0)` - inside the unit sphere: `-0.25`
-* `(0.0, 1.25, 0.0)` - outside the unit sphere: `0.25`
-* `(1.0, 1.0, 1.0)` - on the surface of unit sphere: `0.0`
-* `(0.4, 0.0, 0.3)` - inside the unit sphere: `-0.5`
+* `p` = `(0.0, 0.75, 0.0)` `=>` inside the unit sphere, value: `-0.25`
+* `p` = `(0.0, 1.25, 0.0)` `=>` outside the unit sphere, value: `0.25`
+* `p` = `(1.0, 1.0, 1.0)` `=>` on the surface of unit sphere, value: `0.0`
+* `p` = `(0.4, 0.0, 0.3)` `=>` inside the unit sphere, value: `-0.5`
 
-In this case the result is directly related to the length of the point from the origin.
+In this case it is clear that the results are directly related to the magnitude of `p`.
 
 This can be written algebraically in the form: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - 1.0`.
 
 More complex and flexible shapes can be defined with more complex equations.
 
-For example the equation given above can be generised to work with spheres of any radius: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - RADIUS`.
+For example, a very simple extension to the above would be to generalise the equation to work with spheres, again centered at the origin, but additionally of any radius: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - RADIUS`.
 
-The follow code snippet shows this demo's alegbraic implementations: 
+The follow code snippet shows this demo's alegbraic implementations of various signed distance fields:
 
 ```
 // Signed distance function for a unit sphere (radius = 1).
