@@ -5,3 +5,4 @@ target/
 README.html
 temp.txt
 *.orig
+renders/j*-render*

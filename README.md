@@ -25,7 +25,7 @@ $ cloc --include-lang=Scala .
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Scala                            1             85             94            547
+Scala                            1             96             97            565
 -------------------------------------------------------------------------------
 ```
 
@@ -35,17 +35,11 @@ The process of generating the image above is based on the combination of the fol
 
 ### Constructive Solid Geometery
 
-Constructive solid geometry is the technique of using boolean operators to combine geometrical objects as illustrated:
-
-| Union | Intersection | Difference |
-|:---:|:---:|:---:|
-|<img src="/docs/csg_union.png" width="200" height="150" />|<img src="/docs/csg_intersection.png" width="200" height="150" />|<img src="/docs/csg_difference.png" width="200" height="150" />|
-
-A practicle way to represent CSG objects is with a binary tree, where leaves represent primitives and nodes represent operations.
+Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practicle way to represent CSG objects is with a binary tree, where leaves represent primitives and nodes represent operations.
 
 | CSG storage structure |
 |:---:|
-|<img src="/docs/csg_tree.png" style="float: right;" width="300" height="266" />|
+|<img src="/docs/csg.png" style="float: right;" />|
 
 The following code snippet shows how CSG is implemented within this demo:
 
@@ -74,15 +68,26 @@ Given a position in 3D space, a signed distance field, as a construct, can be us
 
 Signed distance fields are often used in modern game engines where a discrete sampling of points in 3D space (which may or may not be updated at runtime) is packed into a 3D texture and then used as a quantised signed distance field lookup to facilitate the implementation of fast realtime shadows.
 
-Another mechanism for constructing a queryable signed distance field is with pure algebra.
+Another mechanism for constructing a queryable signed distance field is with pure algebra.  Take for example a [unit sphere](https://en.wikipedia.org/wiki/Unit_sphere), consider the values that signed distance field should return for the following input points:
 
-... ... ...
+* `(0.0, 0.75, 0.0)` - inside the unit sphere: `-0.25`
+* `(0.0, 1.25, 0.0)` - outside the unit sphere: `0.25`
+* `(1.0, 1.0, 1.0)` - on the surface of unit sphere: `0.0`
+* `(0.4, 0.0, 0.3)` - inside the unit sphere: `-0.5`
+
+In this case the result is directly related to the length of the point from the origin.
+
+This can be written algebraically in the form: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - 1.0`.
+
+More complex and flexible shapes can be defined with more complex equations.
+
+For example the equation given above can be generised to work with spheres of any radius: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - RADIUS`.
 
 The follow code snippet shows this demo's alegbraic implementations: 
 
 ```
-// Signed distance function for a unit sphere (diameter = 1).
-def sphere (offset: Vector, diameter: Double)(position: Vector): Double = (position - offset).length - (diameter / 2.0)
+// Signed distance function for a unit sphere (radius = 1).
+def sphere (offset: Vector, radius: Double)(position: Vector): Double = (position - offset).length - radius
 
 // Signed distance function for a unit cube (h, w, d = 1).
 def cube (offset: Vector, size: Double)(position: Vector): Double = {
@@ -90,6 +95,11 @@ def cube (offset: Vector, size: Double)(position: Vector): Double = {
   val insideDistance: Double = Math.min (Math.max (d.x, Math.max (d.y, d.z)), 0.0)
   val outsideDistance: Double = d.max (0.0).length
   insideDistance + outsideDistance
+}
+
+def cuboid (offset: Vector, size: Vector)(position: Vector): Double = {
+  val q: Vector = (position - offset).abs - (size / 2.0)
+  q.max (0.0).length + Math.min (Math.max (q.x, Math.max (q.y, q.z)), 0.0)
 }
 ```
 
@@ -249,6 +259,7 @@ The final image is a composition, using varied blending techniques, of the data 
 * [Jamie Wong, Ray marching signed distance functions](http://jamie-wong.com/2016/07/15/ray-marching-signed-distance-functions/)
 * [Alex Benton, Ray marching and signed distance fields](http://bentonian.com/Lectures/FGraphics1819/1.%20Ray%20Marching%20and%20Signed%20Distance%20Fields.pdf)
 * [9-bit Science, Raymarching distance fields](http://9bitscience.blogspot.com/2013/07/raymarching-distance-fields_14.html)
+* [Wikipedia, Signed Distance Function](https://en.wikipedia.org/wiki/Signed_distance_function)
 
 
 ## License

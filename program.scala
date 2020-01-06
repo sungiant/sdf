@@ -31,7 +31,8 @@ object Program {
   def clamp01 (x: Double) = clamp (0, 1)(x)
   def clamp (low: Double, high: Double)(x: Double) = if (x < low) low else if (x > high) high else x
   def clampInt (low: Int, high: Int)(x: Int) = if (x < low) low else if (x > high) high else x
-  def time[R](id: String)(block: => R): R = { // Not FP, urgh, do this properly later.
+  def sign (x: Double) = if (x > 0.0) 1.0 else { if (x < 0.0) -1.0 else 0.0 }
+  def time[R](id: String)(block: => R): R = { // TODO: Not FP, urgh, do this instrumentation properly later.
     val t0 = System.nanoTime()
     val result = block    // call-by-name
     val t1 = System.nanoTime()
@@ -46,32 +47,37 @@ object Program {
   def demo (w: Int, h: Int): List[(String, Image)] = {
     val camera            = Scene.createCamera (y = 4, zx = 6, fov = 57.5, aspect = w.toDouble / h.toDouble, near = 0.1, far = 100.0) 
     val lighting          = Scene.createLighting ()
-    val sdf               = Scene.createEdits () |> CSG.evaluate
+    val jobs              = (Scene.createEdits () :: Nil/*Scene.createDocsEditsList*/).map (_ |> CSG.evaluate)
     val materials         = Scene.createMaterialLibrary ()
     val materialLookup    = (id: Material.ID) => materials.getOrElse (id, Material.default)
 
-    // Render pipeline
-    val depthPass         = Renderer.DepthPass (w, h, sdf, camera, materialLookup)
-    val normalsPass       = Renderer.NormalsPass (depthPass)
-    val shadowPass        = Renderer.ShadowPass (depthPass, lighting)
-    val aoPass            = Renderer.AmbientOcclusionPass (depthPass, normalsPass)
-    val lightingPass      = Renderer.LightingPass (depthPass, normalsPass, lighting)
-    val bundledPasses     = (depthPass.view, shadowPass.view, aoPass.view, lightingPass.view)
+    jobs.zipWithIndex.flatMap { case (sdf, i) =>
+      // Render pipeline
+      val depthPass         = Renderer.DepthPass (w, h, sdf, camera, materialLookup)
+      val normalsPass       = Renderer.NormalsPass (depthPass)
+      val shadowPass        = Renderer.ShadowPass (depthPass, lighting)
+      val aoPass            = Renderer.AmbientOcclusionPass (depthPass, normalsPass)
+      val lightingPass      = Renderer.LightingPass (depthPass, normalsPass, lighting)
+      val bundledPasses     = (depthPass.view, shadowPass.view, aoPass.view, lightingPass.view)
 
-    // Visualise work done
-    ("render-00-composite",              bundledPasses      |> Compositor.aggregate) ::
-    ("render-01-albedo",                 depthPass.view     |> Compositor.albedo) ::
-    ("render-02-depth",                  depthPass.view     |> Compositor.depth) ::
-    ("render-03-depth-cone",             depthPass.view     |> Compositor.depthCone) ::
-    ("render-03-depth-steps",            depthPass.view     |> Compositor.depthStepsPretty) ::
-    ("render-05-normals",                normalsPass.view   |> Compositor.normals) ::
-    ("render-06-shadow-hard",            shadowPass.view    |> Compositor.hardShadows) ::
-    ("render-06-shadow-soft",            shadowPass.view    |> Compositor.softShadows) ::
-    ("render-08-shadow-steps",           shadowPass.view    |> Compositor.shadowStepsPretty) ::
-    ("render-09-ambient-occlusion",      aoPass.view        |> Compositor.ao) ::
-    ("render-10-phong-ambient",          lightingPass.view  |> Compositor.phongAmbient) ::
-    ("render-11-phong-diffuse",          lightingPass.view  |> Compositor.phongDiffuse) ::
-    ("render-12-phong-specular",         lightingPass.view  |> Compositor.phongSpecular) :: Nil
+      val jobID = if (i == 0) "" else s"docs/j${i}-"
+
+      // Visualise work done
+      (s"${jobID}render-00-composite",              bundledPasses      |> Compositor.aggregate) ::
+      (s"${jobID}render-01-albedo",                 depthPass.view     |> Compositor.albedo) ::
+      (s"${jobID}render-02-depth",                  depthPass.view     |> Compositor.depth) ::
+      (s"${jobID}render-03-depth-cone",             depthPass.view     |> Compositor.depthCone) ::
+      (s"${jobID}render-04-depth-steps",            depthPass.view     |> Compositor.depthStepsPretty) ::
+      (s"${jobID}render-05-normals",                normalsPass.view   |> Compositor.normals) ::
+      (s"${jobID}render-06-shadow-hard",            shadowPass.view    |> Compositor.hardShadows) ::
+      (s"${jobID}render-07-shadow-soft",            shadowPass.view    |> Compositor.softShadows) ::
+      (s"${jobID}render-08-shadow-steps",           shadowPass.view    |> Compositor.shadowStepsPretty) ::
+      (s"${jobID}render-09-ambient-occlusion",      aoPass.view        |> Compositor.ao) ::
+      (s"${jobID}render-10-phong-ambient",          lightingPass.view  |> Compositor.phongAmbient) ::
+      (s"${jobID}render-11-phong-diffuse",          lightingPass.view  |> Compositor.phongDiffuse) ::
+      (s"${jobID}render-12-phong-specular",         lightingPass.view  |> Compositor.phongSpecular) :: Nil
+
+    }
   }
 
   // Scene ~ All of the data defining the scene.
@@ -86,51 +92,64 @@ object Program {
     def createLighting (): List[DirectionalLight] = // Todo: Add support for point and spot lighting.
       DirectionalLight (Vector (-1, 1.5, 5), Colour (128, 192, 192), true) ::
       DirectionalLight (Vector (6, 8, 2), Colour (192, 128, 128), true) ::
- //     Light (Vector (8, -4, 8), Colour (128, 128, 128), true) :: 
       Nil
 
-    def createEdits (): CSG.Tree = {
-      lazy val shape: CSG.Tree =
-        CSG.Tree (CSG.Op.Difference,
-          CSG.Tree (CSG.Op.Intersection,
-            CSG.Tree (SDF.cube (Vector.zero, 2.0) _, 3),
-            CSG.Tree (SDF.sphere (Vector.zero, 2.4) _)),
-          CSG.Tree (CSG.Op.Union,
-            CSG.Tree (SDF.sphere (Vector.unitX, 0.8) _),
-            CSG.Tree (CSG.Op.Union,
-              CSG.Tree (SDF.sphere (Vector.unitY, 0.8) _),
-              CSG.Tree (SDF.sphere (Vector.unitZ, 0.8) _))))
-
-      lazy val crown: CSG.Tree =
-        CSG.Tree (CSG.Op.Union,
-          CSG.Tree (CSG.Op.Union,
-            CSG.Tree (CSG.Op.Union,
-              CSG.Tree (SDF.sphere (Vector (0.65, 0.8, -0.65), 0.4) _, 3),
-              CSG.Tree (SDF.sphere (Vector (-0.65, 0.8, -0.65), 0.4) _, 3)),
-            CSG.Tree (SDF.sphere (Vector (0.65, 0.8, 0.65), 0.4) _, 3)),
-          CSG.Tree (SDF.sphere (Vector (-0.65, 0.8, 0.65), 0.4) _, 3))
-
-      lazy val ground: CSG.Tree = CSG.Tree (SDF.cube (Vector (0.0, -5.8, 0.0), 10.0) _, 1)
-
-      lazy val boxes: CSG.Tree =
-        CSG.Tree (CSG.Op.Union,
-          CSG.Tree (CSG.Op.Union,
-            CSG.Tree (CSG.Op.Union,
-              CSG.Tree (SDF.cube (Vector (-3.5, 0.7, -3.5), 3.0) _, 2),
-              CSG.Tree (SDF.cube (Vector (2.0, -0.3, -4.5 ), 1.0) _, 2)),
-            CSG.Tree (SDF.cube (Vector (-4.0, 0.2, 0.0 ), 2.0) _, 2)),
-          CSG.Tree (SDF.cube (Vector (-4.5, -0.3, 2.0 ), 1.0) _, 2))
-
-      CSG.Tree (CSG.Op.Union,
-        CSG.Tree (CSG.Op.Union, ground, boxes),
-        CSG.Tree (CSG.Op.Union, shape, crown))
-    }
-
+    def createEdits (): CSG.Tree = CSG.Tree (ground, boxes, shape, debris)
+    
     def createMaterialLibrary () = Map [Material.ID, Material](
       0 -> Material.default,
       1 -> Material (Colour.warmBlack, 1),
-      2 -> Material (Colour.jade, 1),
-      3 -> Material (Colour.jade, 10.0))
+      2 -> Material (Colour.coolBlack, 10.0),
+      3 -> Material (Colour.jade, 2.0),
+      4 -> Material (Colour.persimmon, 30.0),
+      5 -> Material (Colour.persimmon, 10.0),
+      6 -> Material (Colour.vermillion, 20.0))
+
+    def createDocsEditsList (): List[CSG.Tree] = shape_a :: shape_b :: shape_c :: shape_d :: shape_e :: shape_ab :: shape_de :: shape_cde :: shape :: Nil
+
+    // Clearly seperated for docs CSG example
+    private lazy val shape_a = CSG.Tree (SDF.cube (Vector.zero, 1.9) _, 3)
+    private lazy val shape_b = CSG.Tree (SDF.sphere (Vector.zero, 1.2) _, 3)
+    private lazy val shape_c0 = CSG.Tree (SDF.sphere (Vector.unitX, 0.5) _, 3)
+    private lazy val shape_d0 = CSG.Tree (SDF.sphere (Vector.unitY, 0.5) _, 3)
+    private lazy val shape_e0 = CSG.Tree (SDF.sphere (Vector.unitZ, 0.5) _, 3)
+
+    private lazy val shape_c = CSG.Tree (SDF.cuboid (Vector.zero, Vector (2.2, 0.7, 0.7)) _, 3)
+    private lazy val shape_d = CSG.Tree (SDF.cuboid (Vector.zero, Vector (0.7, 2.2, 0.7)) _, 3)
+    private lazy val shape_e = CSG.Tree (SDF.cuboid (Vector.zero, Vector (0.7, 0.7, 2.2)) _, 3)
+
+    //private lazy val shape_c = CSG.Tree (SDF.cylinder (Vector.zero, 0.5, Vector (-2.0, 0.0, 0.0), Vector (2.0, 0.0, 0.0)) _, 3)
+    //private lazy val shape_d = CSG.Tree (SDF.cylinder (Vector.zero, 0.5, Vector (0.0, -2.0, 0.0), Vector (0.0, 2.0, 0.0)) _, 3)
+    //private lazy val shape_e = CSG.Tree (SDF.cylinder (Vector.zero, 0.5, Vector (0.0, 0.0, -2.0), Vector (0.0, 0.0, 2.0)) _, 3)
+
+    private lazy val shape_ab = CSG.Tree (CSG.Op.Intersection, shape_a, shape_b)
+    private lazy val shape_de = CSG.Tree (CSG.Op.Union, shape_d, shape_e)
+    private lazy val shape_cde = CSG.Tree (CSG.Op.Union, shape_c, shape_de)
+    private lazy val shape: CSG.Tree = CSG.Tree (CSG.Op.Difference, shape_ab, shape_cde)
+
+    private lazy val debris: CSG.Tree =
+      CSG.Tree (
+        CSG.Tree (SDF.sphere (Vector (-1.35, -0.6, 1.65), 0.2) _, 4),
+        CSG.Tree (SDF.sphere (Vector (-1.45, -0.6, 2.35), 0.2) _, 4),
+        CSG.Tree (SDF.sphere (Vector (-1.75, -0.6, 1.09), 0.2) _, 4),
+        CSG.Tree (SDF.sphere (Vector ( -2.70, -0.6, 2.05), 0.2) _, 5),
+        CSG.Tree (SDF.sphere (Vector ( -2.00, -0.6, 3.25), 0.2) _, 5),
+        CSG.Tree (SDF.sphere (Vector ( -3.20, -0.6, 3.60), 0.2) _, 5),
+        CSG.Tree (SDF.sphere (Vector ( 2.50, -0.6, 0.40), 0.2) _, 6),
+        CSG.Tree (SDF.sphere (Vector ( 2.50, -0.6, 1.40), 0.2) _, 6),
+        CSG.Tree (SDF.sphere (Vector ( 1.50, -0.6, 1.40), 0.2) _, 6),
+        CSG.Tree (SDF.sphere (Vector ( 2.50, -0.6, -2.85), 0.2) _, 2),
+        CSG.Tree (SDF.sphere (Vector ( 1.70, -0.6, -2.15), 0.2) _, 2),
+        CSG.Tree (SDF.sphere (Vector ( 2.30, -0.6, -3.55), 0.2) _, 2))
+
+    private lazy val ground: CSG.Tree = CSG.Tree (SDF.cube (Vector (0.0, -5.8, 0.0), 10.0) _, 1)
+
+    private lazy val boxes: CSG.Tree =
+      CSG.Tree (
+        CSG.Tree (SDF.cube (Vector (-3.5, 0.7, -3.5), 3.0) _, 1),
+        CSG.Tree (SDF.cuboid (Vector (2.0, 0.2, -4.5), Vector (1.0, 2.4, 1.0)) _, 1),
+        CSG.Tree (SDF.cube (Vector (-4.0, 0.2, 0.0), 2.0) _, 1),
+        CSG.Tree (SDF.cuboid (Vector (-4.5, 0.2, 2.0), Vector (1.0, 2.8, 1.0)) _, 1))
   }
 
   // Constructive solid geometry logic.
@@ -146,6 +165,7 @@ object Program {
       def apply (operation: Op, left: Tree, right: Tree): Tree = Left (Node (operation, left, right))
       def apply (sdf: SDF): Tree = Right (Leaf (sdf, 0))
       def apply (sdf: SDF, material: Material.ID): Tree = Right (Leaf (sdf, material))
+      def apply (trees: Tree*): Tree = trees.reduceLeft ((x, y) => CSG.Tree (CSG.Op.Union, x, y))
     }
 
     def evaluate (scene: CSG.Tree): MaterialSDF = {
@@ -177,15 +197,18 @@ object Program {
   // Signed distance fields.
   //------------------------------------------------------------------------------------------------------------------//
   object SDF {
-    // Signed distance function for a unit sphere (diameter = 1).
-    def sphere (offset: Vector, diameter: Double)(position: Vector): Double = (position - offset).length - (diameter / 2.0)
+    // Signed distance function for a unit sphere (radius = 1). https://en.wikipedia.org/wiki/Unit_sphere
+    def sphere (offset: Vector, radius: Double)(position: Vector): Double = (position - offset).length - radius
 
-    // Signed distance function for a unit cube (h,w,d = 1).
+    // Signed distance function for a unit cube (h, w, d = 1). https://en.wikipedia.org/wiki/Unit_cube
     def cube (offset: Vector, size: Double)(position: Vector): Double = {
       val d: Vector = (position - offset).abs - (Vector (size, size, size) / 2.0)
-      val insideDistance: Double = Math.min (Math.max (d.x, Math.max (d.y, d.z)), 0.0)
-      val outsideDistance: Double = d.max (0.0).length
-      insideDistance + outsideDistance
+      d.max (0.0).length + Math.min (Math.max (d.x, Math.max (d.y, d.z)), 0.0)
+    }
+
+    def cuboid (offset: Vector, size: Vector)(position: Vector): Double = {
+      val q: Vector = (position - offset).abs - (size / 2.0)
+      q.max (0.0).length + Math.min (Math.max (q.x, Math.max (q.y, q.z)), 0.0)
     }
   }
 
@@ -566,6 +589,11 @@ object Program {
       Image (lightingPass.width, lightingPass.height,
         (0 until lightingPass.height).flatMap { y =>
           (0 until lightingPass.width).map { x =>
+
+            if (depthPass.material (x, y).albedo == Colour.magenta)
+              Colour.magenta
+            else {
+
             val lighting =
               (lightingPass.ambientValue (x, y) * depthPass.material (x, y).albedo.toVector01) +
               (lightingPass.diffuseValue (x, y) * depthPass.material (x, y).albedo.toVector01) +
@@ -578,6 +606,8 @@ object Program {
             //val res = lighting * aoMultiplier * hardShadowMultiplier
             val res = lighting * aoMultiplier * softShadowMultiplier
             Colour.fromVector01 (Vector (clamp01 (res.x), clamp01 (res.y), clamp01 (res.z)))
+
+            }
           }
         })
   }
@@ -651,14 +681,16 @@ object Program {
   }
   object Image {
     def create (w: Int, h: Int)(r: IndexedSeq[Colour]): Image = Image (w, h, r)
-    def writePNG (path: String)(image: Image): Unit = {
+    def writePNG (path: String)(image: Image): Unit = { // TODO: Not FP, urgh, do this IO properly later.
       import javax.imageio.ImageIO, java.awt.image.BufferedImage, java.io.File
-      val buffer = new BufferedImage (image.width, image.height, BufferedImage.TYPE_INT_RGB)
+      val buffer = new BufferedImage (image.width, image.height, BufferedImage.TYPE_INT_ARGB)
        (0 until image.height)
         .flatMap { y => (0 until image.width).map { x => (x, y) } }
         .foreach { case (x, y) =>
           val c = image.get (x, y)
-          val value = c.r.toInt << 16 | c.g.toInt << 8 | c.b.toInt
+
+          val a = if (c == Colour.magenta) 0 else 255
+          val value = a << 24 | c.r.toInt << 16 | c.g.toInt << 8 | c.b.toInt
           buffer.setRGB (x, y, value)
         }
       val file = new File (path)
