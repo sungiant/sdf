@@ -35,11 +35,9 @@ The process of generating the image above is based on the combination of the fol
 
 ### Constructive Solid Geometery
 
-Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practicle way to represent CSG objects is with a binary tree, where leaves represent primitives and nodes represent operations.
+Constructive solid geometry is the technique of using boolean operators to combine geometrical objects, as shown below.  A practicle way to represent CSG objects is with a binary tree, where leaves represent primitives and nodes represent operations.
 
-| CSG storage structure |
-|:---:|
-|<img src="/docs/csg.png" style="float: right;" />|
+|<img src="/docs/csg.png" style="float: right;"/>
 
 The following code snippet shows how CSG is implemented within this demo:
 
