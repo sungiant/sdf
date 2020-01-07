@@ -5,7 +5,6 @@
 
 This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance fields.
 
-
 The renderer is written specifically to run exclusively on the CPU instead of the GPU so as to best illustrate the entire rendering pipeline as clearly and concisely as possible.
 
 When run, the program produces this image (writing it to disk in PNG format):
@@ -73,10 +72,10 @@ Signed distance fields are often used in modern game engines where a discrete sa
 
 Another mechanism for constructing a queryable signed distance field is with pure algebra.  Take for example the surface of a [unit sphere](https://en.wikipedia.org/wiki/Unit_sphere) and consider the results that a signed distance field query should yield for the following input points:
 
-* `p` = `(0.0, 0.75, 0.0)` `=>` inside the unit sphere, value: `-0.25`
-* `p` = `(0.0, 1.25, 0.0)` `=>` outside the unit sphere, value: `0.25`
-* `p` = `(1.0, 1.0, 1.0)` `=>` on the surface of unit sphere, value: `0.0`
-* `p` = `(0.4, 0.0, 0.3)` `=>` inside the unit sphere, value: `-0.5`
+* `p` = `(0.0, 0.75, 0.0)` => inside the unit sphere, value: `-0.25`
+* `p` = `(0.0, 1.25, 0.0)` => outside the unit sphere, value: `0.25`
+* `p` = `(1.0, 1.0, 1.0)` => on the surface of unit sphere, value: `0.0`
+* `p` = `(0.4, 0.0, 0.3)` => inside the unit sphere, value: `-0.5`
 
 In this case it is clear that the results are directly related to the magnitude of `p`.
 
@@ -129,33 +128,44 @@ def evaluate (scene: CSG.Tree): SDF = {
 ```
 
 ### Sphere Tracing SDFs
+This is particularly interesting and is achived through a technique known as ray-marching, in our case a particular specialisation known as sphere tracing.  Here's how it works:
 
-... ... ...
+
+
+
 
 
 ### Rasterization
 
-... ... ...
+Given a scene defined using SDFs and CSG the process of producing the image above is acheived by rasterizing the information availble into the pixels.  This is achived using the sphere tracing method decribed above once for each pixel of the final image.
 
+<img src="/docs/raster.png" style="float: right;" />
+
+Essentially to produce a rasterization of an SDF:
+
+* select a position for the camera.
+* draw a grid in front of the camera at an appropriate position to capture the required field of view.
+* each grid square corresponds to a pixel of the output rasterization.
+* send a ray (using sphere tracing) from the camera though the center of each grid square.
 
 ## Rendering Techniques
 
-The final render is a composition of multiple datasets produced from the application of the following rendering techniques:
+The final render in this demo is a standard composition of multiple common datasets (just like the z-buffer and g-buffers in a [deferred renderer](https://en.wikipedia.org/wiki/Deferred_shading)).  The datasets themselves are nothing new or special - the interesting part here is, given our unconventional SDF scene definition, how we go about producing the datasets.
 
 ### Depth
 
-Given a single signed distance function reperesenting a scene, the depth buffer, by defintion, is the natural rasterized representation of that signed distance field at a given camera location:
+The simplest and most logial dataset to produce in this specific context; given a single signed distance function reperesenting a scene, the z-buffer, by defintion, is the natural rasterized representation of that signed distance field at a given camera location:
 
 
 | Depth buffer | Processing cost |
 |:---:|:---:|
 |<img src="/renders/render-02-depth.png" width="320" height="180" />|<img src="/renders/render-04-depth-steps.png" width="320" height="180" />|
 
-This buffer can be easily produced by sphere tracing the Scene SDF with a ray corresponding to each camera pixel.
+This dataset can be easily produced by sphere tracing the Scene SDF with a ray corresponding to each camera pixel.  The image to the right gives an indication of the cost of calculting the depth value for each pixel.
 
 ### Normals
 
-Signed distance functions do not directly provide a way to access surface normals, however, surface normals can be easily estimated by making additional queries of the scene SDF around the axes at given point on a surface.
+Signed distance functions do not directly provide a way to access surface normals, however, surface normals can be easily estimated by making additional queries of the scene SDF on each axes around given point on a surface.
 
 ```
 type SDF = Vector => Double
@@ -175,7 +185,7 @@ This technique introduces, for each pixel representing a surface, a performance 
 
 ### Albedo
 
-In this demo the signed distance function used to represent the scene is composed of multiple signed distance functions using constructive solid geometry.  By augmenting the signature of a standard signed distance function it is possible to introduce per object material identification data, which can be used to produce buffers like this Albedo buffer:
+In this demo the signed distance function used to represent the scene is composed of multiple signed distance functions using constructive solid geometry.  By augmenting the signature of a standard signed distance function it is possible to introduce per object material identification data, which can then be used to produce buffers like this Albedo buffer:
 
 | Albedo buffer |
 |:---:|
@@ -240,7 +250,7 @@ This technique makes it easy to assign material idenfiers to simple SDF shapes a
 
 ### Lighting
 
-The lighting technique used in the demo is simply an application of the Phong lighting model.  The input data required to apply the Phong lighting model is limited to surface positions, surface normals, material properties and camera location; all required input data is easily derived from calculations used and descibed already in this article, as such, when it comes to this particular lighting technique, there is no relevance or change in approach needed due to the demo scene being defined as a SDF.
+The lighting technique used in the demo is simply an application of the Phong lighting model.  The input data required to apply the Phong lighting model is limited to surface positions, surface normals, material properties and camera location; all required input data is easily derived from calculations used and descibed already, as such, when it comes to this particular lighting technique, there is no relevance or change in approach needed due to the demo scene being defined as a SDF.
 
 | Ambient component | Diffuse component | Specular component |
 |:---:|:---:|:---:|
@@ -249,7 +259,7 @@ The lighting technique used in the demo is simply an application of the Phong li
 
 ### Compositing
 
-The final image is a composition, using varied blending techniques, of the data buffers produced during the execution of the demo and illustrated above in this article.
+The final image is a composition, using varied blending techniques, of the data buffers produced during the execution of the demo and illustrated above.
 
 | Aggregate composition |
 |:---:|
