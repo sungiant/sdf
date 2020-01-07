@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/sungiant/sdf.png?branch=master)][travis]
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)][license]
 
-This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance fields.
+This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance functions.
 
 The renderer is written specifically to run exclusively on the CPU instead of the GPU so as to best illustrate the entire rendering pipeline as clearly and concisely as possible.
 
@@ -24,7 +24,7 @@ $ cloc --include-lang=Scala .
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Scala                            1             96             97            565
+Scala                            1             96            102            572
 -------------------------------------------------------------------------------
 ```
 
@@ -34,7 +34,7 @@ The process of generating the image above is based on the combination of the fol
 
 ### Constructive Solid Geometry
 
-Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practical way to represent CSG objects is with a binary tree - with leaves representing primitives and nodes representing operations.
+Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practical way to represent CSG objects is with a binary tree - leaves representing primitives and nodes representing operations.
 
 <img src="/docs/csg.png" style="float: right;" />
 
@@ -62,10 +62,9 @@ object CSG {
 
 Constructive solid geometry is a powerful abstraction that provides a language with which complex geometry can be defined using relatively simple building blocks.
 
-
 ### Signed Distance Fields
 
-Given a position in 3D space (`p`), a signed distance field, as a construct, can be used to query both the distance between `p` and the nearest surface and whether `p` is inside or outside of the surface; the resultant value of a signed distance field query is a signed real number, the magnitude of which indicates the distance between `p` and the surface, the sign indicates whether `p` lies inside (negative) or outside (positive) the surface.
+Given a position in 3D space `p`, a signed distance field, as a construct, can be used to query both the distance between `p` and the nearest surface and whether `p` is inside or outside of the surface; the resultant value of a signed distance field query is a signed real number, the magnitude of which indicates the distance between `p` and the surface, the sign indicates whether `p` lies inside (negative) or outside (positive) the surface.
 
 Signed distance fields are often used in modern game engines where a discrete sampling of points in 3D space (which may or may not be updated at runtime) is packed into a 3D texture and then used as a quantised signed distance field lookup to facilitate the implementation of fast realtime shadows.
 
@@ -78,13 +77,13 @@ Another mechanism for constructing a queryable signed distance field is with pur
 
 In this case it is clear that the results are directly related to the magnitude of `p`.
 
-This can be written algebraically in the form: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - 1.0`.
+This can be written algebraically in the form: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - 1.0` - also known in this form as a signed distance function.
 
 More complex and flexible shapes can be defined with more complex equations.
 
-For example, a very simple extension to the above would be to generalise the equation to work with spheres, again centered at the origin, but additionally of any radius: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - RADIUS`.
+For example, a very simple extension to the above would be to generalise the function to work with spheres, again centered at the origin, but additionally of any radius: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - RADIUS`.
 
-The following code snippet shows this demo's algebraic implementations of various signed distance fields:
+The following code snippet shows this demo's implementations of various signed distance functions:
 
 ```scala
 // Signed distance function for a unit sphere (radius = 1).
@@ -138,23 +137,23 @@ Given a point `p` we can use an SDF to quickly determine the distance between th
 |:---:|
 |<img src="/docs/sdf_query.png" width="320" height="180" />|
 
-Ideally however it would be very useful if we could find the distance from our point `p` to the nearest surface constrained along a specific direction.
+It would, however,  be very useful if we could find the distance from our point `p` to the nearest surface constrained along a specific direction.
 
 | Constrained SDF query |
 |:---:|
 |<img src="/docs/constrained_sdf_query.png" width="320" height="180" />|
 
-Ray constrained SDF queries are essential for working with SDFs and be calculated with technique known as ray-marching.  In this demo a particular optimised specialisation known as sphere tracing is used.  Here's how it works:
+Ray constrained SDF queries are essential for working with SDFs and be calculated with technique known as ray-marching.  In this demo a particular optimised specialisation of ray-marching known as sphere tracing is used.  Here's how it works:
 
 * Given a starting point `p0` and a direction (i.e. a ray) begin by querying the SDF as usual to produce a depth result `r0`.
 * Next step along the ray from `p0` by a distance of `r0` and query again.
 * Continue this process until the result returned is approximately zero.
-* Finally sum all results to produce the depth value required.
-* Additionally, if the number of steps taken exceeds an abitary predefined threshold, stop the process and assume that the ray does not hit a suface.
+* Finally sum all results to produce the final depth value.
+* Additionally, if the number of steps taken exceeds an abitary predefined threshold, stop the process and assume that the ray does not intersect a suface.
 
 <img src="/docs/sphere_tracing.png" style="float: right;" />
 
-The following code sample shows the part of this demo that implements the sphere tracing algorithm:
+The following code sample shows the part of this demo that implements the sphere tracing algorithm (along with some extra stat tracking that'll be used later):
 
 ```scala
 object Algorithm {
@@ -208,7 +207,7 @@ object Algorithm {
 
 ### Rasterization
 
-Given a scene defined using SDFs and CSG the process of producing the image above is done by rasterizing the information available into the pixels  using the sphere tracing method described above once for each pixel of the final image.
+Given a scene defined using SDFs and CSG the process of producing an image is done by rasterizing the information available into pixels using the sphere tracing method described above once for each pixel of the final image.
 
 <img src="/docs/raster.png" width="600" style="float: right;" />
 
@@ -221,12 +220,11 @@ To produce a rasterization of an SDF:
 
 ## Rendering Techniques
 
-The final render in this demo is a standard composition of multiple common datasets (just like the z-buffer and g-buffers in a [deferred renderer](https://en.wikipedia.org/wiki/Deferred_shading)).  The datasets themselves are nothing new or special - the interesting part here is (given our unconventional SDF scene definition) how we go about producing the datasets.
+The final render in this demo is a standard composition of multiple common datasets (just like the z-buffer and g-buffers in a [deferred renderer](https://en.wikipedia.org/wiki/Deferred_shading)).  The datasets themselves are nothing new or special - the interesting part here is how we go about producing the datasets given our unconventional SDF scene definition .
 
 ### Depth
 
-The most logical dataset to produce from a scene SDF is the depth buffer as each SDF query yields a depth value.  Given a particular camera position and setup the rasterization of a scene SDF is naturally the depth buffer.
-
+The most logical dataset to produce from a scene SDF is the depth buffer as each SDF query yields a depth value.  Given a particular camera position and setup the rasterization of a scene SDF is naturally equivalent to the depth buffer.
 
 | Depth buffer | Processing cost |
 |:---:|:---:|
@@ -236,7 +234,7 @@ This dataset can be easily produced by sphere tracing the scene SDF with a ray c
 
 ### Normals
 
-Signed distance functions do not directly provide a way to access surface normals, however, surface normals can be easily estimated by making additional queries of the scene SDF on each axes around given point on a surface.
+Signed distance functions do not directly provide a way to access surface normals, however, surface normals can be easily estimated by making additional queries of the scene SDF on each axes around a given point on a surface.
 
 ```scala
 type SDF = Vector => Double
@@ -251,7 +249,7 @@ def estimateNormal (pos: Vector, sdf: SDF) = Vector (
 |:---:|
 |<img src="/renders/render-05-normals.png" width="320" height="180" />|
 
-This technique introduces, for each pixel representing a surface, a performance hit of six additional queries of the Scene SDF.
+This technique introduces, for each pixel representing a surface, a performance hit of six additional queries of the scene SDF.
 
 
 ### Albedo
@@ -297,13 +295,13 @@ This technique makes it easy to assign material identifiers to simple SDF shapes
 
 ### Shadows
 
-Calculating shadows in this context is surprisingly straightforward.  For each pixel the depth buffer can be used to calculate the point `p` in the scene corresponding to the position on the surface for that pixel (if there is one), then calculate a ray from `p` towards a light source at position `l`.  Next sphere trace along that ray - if the resultant depth is less than the distance between `p` and `l` we can determine that the surface at `p` is occluded by something and as such the pixel should be considered to be in shadow.
+Calculating shadows in this context is surprisingly straightforward.  For each pixel the depth buffer can be used to calculate the point `p` in the scene corresponding to the position on the surface for that pixel (if there is one), then calculate a ray from `p` towards a light source at position `l`.  Next sphere trace along that ray - if the resultant depth is less than the distance between `p` and `l` we can determine that the surface at `p` is occluded and as such the pixel should be considered to be in shadow.
 
 | Hard Shadows | Processing cost | 
 |:---:|:---:|
 |<img src="/renders/render-06-shadow-hard.png" width="320" height="180" />|<img src="/renders/render-08-shadow-steps.png" width="320" height="180" />|
 
-Soft shadows are also straightforward, albeit they require keeping track of additional data whilst sphere tracing the rays towards the light sources.  The particular data needed is the minimum cone ratio observed whilst sphere tracing.  The cone ratio can be calculated each iteration as the ratio of the step size over the total distance covered.  The minimum observed result is then directly proportional to the soft shadow penumbra.  Ignation Quilezles does a great job of explaining this in detail [here](https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm).
+Soft shadows are also straightforward, albeit they require keeping track of additional data whilst sphere tracing the rays to the light sources.  The particular data needed is the minimum cone ratio observed whilst sphere tracing.  The cone ratio can be calculated each iteration as the ratio of the step size over the total distance covered.  The minimum observed result is then directly proportional to the soft shadow penumbra.  Ignation Quilezles does a great job of explaining this in detail [here](https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm).
 
 | Soft Shadows |
 |:---:|
