@@ -296,7 +296,7 @@ object Program {
       trait Input                                    // Raw input data for a render pass.
       trait Output                                   // Raw output data for a render pass.
       trait Stats                                    // Raw processing stats for a render pass.
-      trait View { def width: Int; def height: Int } // Practical abstaction over raw render pass data.
+      trait View { def width: Int; def height: Int } // Practical abstraction over raw render pass data.
     }
 
 
@@ -661,7 +661,7 @@ object Program {
     lazy val frustumDepth = far - near
 
     // Given a location anywhere on the near bounding surface of the camera's view frustum, returns the associated ray.
-    private [this] def ray (x: Double, y: Double): Ray = { // co-ordinates range between -1.0 and +1.0 for each axis.
+    private [this] def ray (x: Double, y: Double): Ray = { // coordinates range between -1.0 and +1.0 for each axis.
       val xx = (x + 1.0) / 2.0
       val yy = (y + 1.0) / 2.0
       val sh = Math.sin (fov / 2.0)
@@ -686,7 +686,7 @@ object Program {
     }}
   }
 
-  // Simple bitmap stucture with the ability to write to PNG.
+  // Simple bitmap structure with the ability to write to PNG.
   //------------------------------------------------------------------------------------------------------------------//
   case class Image (width: Int, height: Int, pixels: IndexedSeq[Colour]) {
     def get (x: Int, y: Int): Colour = pixels (x + y * width)
@@ -717,7 +717,7 @@ object Program {
   object Quaternion {
     lazy val identity = Quaternion (0, 0, 0, 1)
 
-    def fromYawPitchRoll (yaw: Double, pitch: Double, roll: Double): Quaternion = { // Right handed co-ordinate system.
+    def fromYawPitchRoll (yaw: Double, pitch: Double, roll: Double): Quaternion = { // Right handed coordinate system.
       val (y, p, r) = (yaw * 0.5, pitch * 0.5, roll * 0.5)
       val (sy, cy) = (y |> Math.sin, y |> Math.cos)
       val (sp, cp) = (p |> Math.sin, p |> Math.cos)

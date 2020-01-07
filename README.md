@@ -313,7 +313,7 @@ Multiple light sources can be easily supported by casting more rays and then com
 
 ### Ambient Occlusion
 
-This demo implements a simple approximation for ambient occlusion.  For each pixel corresponding to a point `p` on a surface the algorithm asks the question "how far is it to the nearest neighboring surface".  The particulars of the algorithm used in the demo are described [here](http://bentonian.com/Lectures/FGraphics1819/7.%20Global%20Illumination.pdf) on (page 13).
+This demo implements a simple approximation for ambient occlusion.  For each pixel corresponding to a point `p` on a surface the algorithm asks the question "how far is it to the nearest neighbouring surface".  The particulars of the algorithm used in the demo are described [here](http://bentonian.com/Lectures/FGraphics1819/7.%20Global%20Illumination.pdf) on (page 13).
 
 | Ambient Occlusion |
 |:---:|
