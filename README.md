@@ -150,6 +150,7 @@ Ray constrained SDF queries are an essential tool for working with SDFs and be a
 * Next step along the ray from `p0` by a distance of `r0` and query again.
 * Continue this process until the result returned is approximately zero.
 * Finally sum all results to produce the depth value required.
+* Additionally, if the number of steps taken exceeds an abitary predefined threshold, stop the process and assume that the ray does not hit a suface.
 
 <img src="/docs/sphere_tracing.png" style="float: right;" />
 
@@ -183,20 +184,20 @@ object Algorithm {
           March (Some (distanceCovered, lastMaterial), settings, March.Stats (minConeRatio, settings.iterationLimit))
         case _ =>
           ((ray.position + ray.direction * distanceCovered) |> sdf) match {
-          case (nextStepSize, m) if nextStepSize < settings.tolerance =>
-            // Hit! `p` is within `settings.tolerance` being considered on the surface.
-            March (Some ((distanceCovered, m)), settings, March.Stats (minConeRatio, stepCount))
-          case (nextStepSize, m) =>
-            distanceCovered + nextStepSize match { // new distance along the ray
-              case newDistanceCovered if newDistanceCovered >= end =>
-                // We've marched out of the camera's view frustum.
-                March (None, settings, March.Stats (minConeRatio, stepCount))
-              case newDistanceCovered =>
-                val nextDistanceCovered = Math.max (settings.minimumStep, newDistanceCovered)
-                val newMinConeRatio = if (distanceCovered == 0.0) Double.MaxValue
-                                      else Math.min (minConeRatio, nextStepSize / distanceCovered)
-                step (nextDistanceCovered, newMinConeRatio, stepCount + 1, m)
-            }
+            case (nextStepSize, m) if nextStepSize < settings.tolerance =>
+              // Hit! `p` is within `settings.tolerance` being considered on the surface.
+              March (Some ((distanceCovered, m)), settings, March.Stats (minConeRatio, stepCount))
+            case (nextStepSize, m) =>
+              distanceCovered + nextStepSize match { // new distance along the ray
+                case newDistanceCovered if newDistanceCovered >= end =>
+                  // We've marched out of the camera's view frustum.
+                  March (None, settings, March.Stats (minConeRatio, stepCount))
+                case newDistanceCovered =>
+                  val nextDistanceCovered = Math.max (settings.minimumStep, newDistanceCovered)
+                  val newMinConeRatio = if (distanceCovered == 0.0) Double.MaxValue
+                                        else Math.min (minConeRatio, nextStepSize / distanceCovered)
+                  step (nextDistanceCovered, newMinConeRatio, stepCount + 1, m)
+              }
           }
       }
     }
@@ -220,11 +221,11 @@ To produce a rasterization of an SDF:
 
 ## Rendering Techniques
 
-The final render in this demo is a standard composition of multiple common datasets (just like the z-buffer and g-buffers in a [deferred renderer](https://en.wikipedia.org/wiki/Deferred_shading)).  The datasets themselves are nothing new or special - the interesting part here is, given our unconventional SDF scene definition, how we go about producing the datasets.
+The final render in this demo is a standard composition of multiple common datasets (just like the z-buffer and g-buffers in a [deferred renderer](https://en.wikipedia.org/wiki/Deferred_shading)).  The datasets themselves are nothing new or special - the interesting part here is (given our unconventional SDF scene definition) how we go about producing the datasets.
 
 ### Depth
 
-The simplest and most logical dataset to produce from a scene SDF is the depth buffer as each SDF query yields a depth value.  Given a particular camera position and setup the rasterization of a scene SDF is naturally the depth buffer.
+The most logical dataset to produce from a scene SDF is the depth buffer as each SDF query yields a depth value.  Given a particular camera position and setup the rasterization of a scene SDF is naturally the depth buffer.
 
 
 | Depth buffer | Processing cost |
@@ -296,26 +297,52 @@ This technique makes it easy to assign material identifiers to simple SDF shapes
 
 ### Shadows
 
-... ... ...
+Calculating shadows in this context is surprisingly straightforward.  For each pixel the depth buffer can be used to calculate the point `p` in the scene corresponding to the position on the surface for that pixel (if there is one), then calculate a ray from `p` towards a light source at position `l`.  Next sphere trace along that ray - if the resultant depth is less than the distance between `p` and `l` we can determine that the surface at `p` is occluded by something and as such the pixel should be considered to be in shadow.
 
 | Hard Shadows | Processing cost | 
 |:---:|:---:|
 |<img src="/renders/render-06-shadow-hard.png" width="320" height="180" />|<img src="/renders/render-08-shadow-steps.png" width="320" height="180" />|
 
-... ... ...
+Soft shadows are also straightforward, albeit they require keeping track of additional data whilst sphere tracing the rays towards the light sources.  The particular data needed is the minimum cone ratio observed whilst sphere tracing.  The cone ratio can be calculated each iteration as the ratio of the step size over the total distance covered.  The minimum observed result is then directly proportional to the soft shadow penumbra.  Ignation Quilezles does a great job of explaining this in detail [here](https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm).
 
 | Soft Shadows |
 |:---:|
 |<img src="/renders/render-07-shadow-soft.png" width="320" height="180" />|
 
+Multiple light sources can be easily supported by casting more rays and then combining the shadow results as desired.  To calculate shadows each pixel requires one additional sphere tracing operation for each shadow casting light source.
 
 ### Ambient Occlusion
 
-... ... ...
+This demo implements a rough approximation for ambient occlusion.  For each pixel corresponding to a point `p` on a surface ray march (fixed size steps) a small distance from `p` along the surface normal at `p`.  Keep track of the minimum ratio of depth over distance traveled and use this as the AO value.
 
 | Ambient Occlusion |
 |:---:|
 |<img src="/renders/render-09-ambient-occlusion.png" width="320" height="180" />|
+
+Here's the code:
+
+```scala
+(0 until input.depthPass.input.h * input.depthPass.input.w).map { i =>
+  (input.depthPass.surfacePosition (i), input.normalsPass.output.surfaceNormals (i)) match {
+    case (Some (p), Some (n)) =>
+      val step = 0.01
+      val lim = 0.1
+      @scala.annotation.tailrec
+      def calcAOR (a: Double, t: Double): Double = {
+        if (t > lim) a
+        else {
+          val samplePosition = p + (n * t)
+          val d = Math.abs (input.depthPass.input.sdf (samplePosition)._1)
+          val a2 = Math.min (a, d / t)
+          val t2 = t + Math.max (d, step)
+          calcAOR (a2, t2)
+        }
+      }
+      calcAOR (1.0, step)
+    case _ => 1.0
+  }
+}
+```
 
 ### Lighting
 
