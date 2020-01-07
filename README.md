@@ -144,7 +144,7 @@ Ideally however it would be very useful if we could find the distance from our p
 |:---:|
 |<img src="/docs/constrained_sdf_query.png" width="320" height="180" />|
 
-Ray constrained SDF queries are an essential tool for working with SDFs and be achieved through a technique known as ray-marching.  In this demo a particular optimised specialisation known as sphere tracing is used.  Here's how it works:
+Ray constrained SDF queries are essential for working with SDFs and be calculated with technique known as ray-marching.  In this demo a particular optimised specialisation known as sphere tracing is used.  Here's how it works:
 
 * Given a starting point `p0` and a direction (i.e. a ray) begin by querying the SDF as usual to produce a depth result `r0`.
 * Next step along the ray from `p0` by a distance of `r0` and query again.
