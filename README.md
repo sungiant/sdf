@@ -142,7 +142,7 @@ Ideally however it would be very useful if we could find the distance from our p
 
 | Constrained SDF query |
 |:---:|
-|<img src="/docs/ray_constrained_sdf_query.png" width="320" height="180" />|
+|<img src="/docs/constrained_sdf_query.png" width="320" height="180" />|
 
 Ray constrained SDF queries are an essential tool for working with SDFs and be achieved through a technique known as ray-marching.  In this demo a particular optimised specialisation known as sphere tracing is used.  Here's how it works:
 
@@ -167,8 +167,8 @@ object Algorithm {
     object Settings { lazy val default = Settings (256, 0.001, 0.0001) }
 
     // minimumConeRatio: the minimum result of the ratio of all individual sdf results along the march over the
-    //                   distance covered at that point.
-    // iterations: number of iterations performed
+    //                   total distance covered at that iteration.
+    // iterations:       number of iterations performed
     case class Stats (minimumConeRatio: Double, iterations: Int)
   }
 
@@ -313,13 +313,13 @@ Multiple light sources can be easily supported by casting more rays and then com
 
 ### Ambient Occlusion
 
-This demo implements a rough approximation for ambient occlusion.  For each pixel corresponding to a point `p` on a surface ray march (fixed size steps) a small distance from `p` along the surface normal at `p`.  Keep track of the minimum ratio of depth over distance traveled and use this as the AO value.
+This demo implements a simple approximation for ambient occlusion.  For each pixel corresponding to a point `p` on a surface the algorithm asks the question "how far is it to the nearest neighboring surface".  The particulars of the algorithm used in the demo are described [here](http://bentonian.com/Lectures/FGraphics1819/7.%20Global%20Illumination.pdf) on (page 13).
 
 | Ambient Occlusion |
 |:---:|
 |<img src="/renders/render-09-ambient-occlusion.png" width="320" height="180" />|
 
-Here's the code:
+Essentially by ray marching (i.e. fixed size steps) a small distance from `p` along the surface normal at `p` and keeping track of the cone ratio we can produce a nice approximation of ambient occlusion:
 
 ```scala
 (0 until input.depthPass.input.h * input.depthPass.input.w).map { i =>

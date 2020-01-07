@@ -223,8 +223,9 @@ object Program {
       case class Settings (iterationLimit: Int, minimumStep: Double, tolerance: Double)
       object Settings { lazy val default = Settings (256, 0.001, 0.0001) }
 
-      // minimumConeRatio: the minimum result of the ratio of all individual sdf results along the march over the distance covered at that point.
-      // iterations: number of iterations performed
+    // minimumConeRatio: the minimum result of the ratio of all individual sdf results along the march over the
+    //                   total distance covered at that iteration.
+    // iterations:       number of iterations performed
       case class Stats (minimumConeRatio: Double, iterations: Int)
     }
 
@@ -414,7 +415,7 @@ object Program {
                   case Algorithm.March (None, _, stats) =>
                     val k = 2.0; val z = stats.minimumConeRatio * k // https://iquilezles.org/www/articles/rmshadows/rmshadows.htm
                     val softShadow = 1.0 - clamp01 (z)
-                    R ( false, softShadow, stats.iterations)
+                    R (false, softShadow, stats.iterations)
                   case _ =>
                     R (false, 0.0, 0)
                 }
