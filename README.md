@@ -40,7 +40,7 @@ Constructive solid geometry is the technique of using boolean operators to combi
 
 The following code snippet shows how CSG trees are implemented within this demo:
 
-```
+```scala
 object CSG {
   trait Op
   object Op {
@@ -86,7 +86,7 @@ For example, a very simple extension to the above would be to generalise the equ
 
 The following code snippet shows this demo's algebraic implementations of various signed distance fields:
 
-```
+```scala
 // Signed distance function for a unit sphere (radius = 1).
 def sphere (offset: Vector, radius: Double)(position: Vector): Double = (position - offset).length - radius
 
@@ -109,7 +109,7 @@ def cuboid (offset: Vector, size: Vector)(position: Vector): Double = {
 
 Signed distance functions are particularly suited to being combined using the principles of constructive solid geometry, this is because the boolean operators involved can be mapped directly to mathematical operators:
 
-```
+```scala
 type SDF = Vector => Double
 
 def evaluate (scene: CSG.Tree): SDF = {
@@ -155,7 +155,7 @@ Ray constrained SDF queries are an essential tool for working with SDFs and be a
 
 The following code sample shows the part of this demo that implements the sphere tracing algorithm:
 
-```
+```scala
 object Algorithm {
 
   // distance: distance to surface intersection (if intersection was found) from start of ray.
@@ -237,7 +237,7 @@ This dataset can be easily produced by sphere tracing the scene SDF with a ray c
 
 Signed distance functions do not directly provide a way to access surface normals, however, surface normals can be easily estimated by making additional queries of the scene SDF on each axes around given point on a surface.
 
-```
+```scala
 type SDF = Vector => Double
 val NORM_SAMPLE = 0.001
 def estimateNormal (pos: Vector, sdf: SDF) = Vector (
@@ -263,7 +263,7 @@ In this demo the signed distance function used to represent the scene is compose
 
 Augmenting the signature of the SDF such that, in addition to returning a depth value, a material identifier associated with the object at the given location is also returned can be used in conjunction with an augmented version of the function above to support CSG composition of objects with material associations.  The following snippet shows how the CSG evaluation function can be adjusted:
 
-```
+```scala
 type MaterialSDF = Vector => (Double, Material.ID)
 
 def evaluate (scene: CSG.Tree): MaterialSDF = {
