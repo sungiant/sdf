@@ -1,4 +1,4 @@
-# Sphere tracing signed distance fields
+# Sphere tracing signed distance functions
 
 [![Build Status](https://travis-ci.org/sungiant/sdf.png?branch=master)][travis]
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)][license]
@@ -38,7 +38,7 @@ Constructive solid geometry is the technique of using boolean operators to combi
 
 <img src="/docs/csg.png" style="float: right;" />
 
-The following code snippet shows how CSG is implemented within this demo:
+The following code snippet shows how CSG trees are implemented within this demo:
 
 ```
 object CSG {
@@ -59,7 +59,6 @@ object CSG {
   }
 }
 ```
-
 
 Constructive solid geometry is a powerful abstraction that provides a language with which complex geometry can be defined using relatively simple building blocks.
 
@@ -105,7 +104,10 @@ def cuboid (offset: Vector, size: Vector)(position: Vector): Double = {
 }
 ```
 
-Algebraic signed distance functions work well with constructive solid geometry techniques as the boolean operators involved can be mapped directly to mathematical operators:
+
+### Combining SDFs using CSG
+
+Signed distance functions are particularly suited to being combined using the principles of constructive solid geometry, this is because the boolean operators involved can be mapped directly to mathematical operators:
 
 ```
 type SDF = Vector => Double
@@ -127,14 +129,70 @@ def evaluate (scene: CSG.Tree): SDF = {
 }
 ```
 
+
 ### Sphere Tracing SDFs
 
-This is particularly interesting and is achived through a technique known as ray-marching, in our case a particular specialisation known as sphere tracing.  Here's how it works:
+Given a point `p` we can use an SDF to quickly determine the distance between that point and the nearest surface defined by that SDF.  Ideally however it would be very useful if we could find the distance from our point `p` constrained along a specific direction to the nearest surface.
 
+| Standard SDF query | Ray constrained SDF query |
+|:---:|:---:|
+|<img src="/docs/sdf_query.png" width="320" height="180" />|<img src="/docs/ray_constrained_sdf_query.png" width="320" height="180" />|
 
-...
+Ray constrained SDF queries are an essential tool for working with SDFs and be done through a technique known as ray-marching.  In this demo a particular optimised specialisation known as sphere tracing is used.  Here's how it works:
 
+* Given a starting point `p0` and a direction (i.e. a ray) begin by querying the SDF as usual to produce a depth result `r0`.
+* Next step along the ray from `p0` by a distance of `r0` and query again.
+* Continue this process until the result returned is approximately zero.
+* Finally sum all results to produce the depth value required.
 
+<img src="/docs/sphere_tracing.png" style="float: right;" />
+
+The following code sample shows the part of this demo that implements the sphere tracing algorithm:
+
+```
+object Algorithm {
+
+  // distance: distance to surface intersection (if intersection was found) from start of ray.
+  case class March (distance: Option[(Double, Material.ID)], settings: March.Settings, stats: March.Stats)
+
+  object March {
+    case class Settings (iterationLimit: Int, minimumStep: Double, tolerance: Double)
+    object Settings { lazy val default = Settings (256, 0.001, 0.0001) }
+
+    // minimumConeRatio: the minimum result of the ratio of all individual sdf results along the march over the distance covered at that point.
+    // iterations: number of iterations performed
+    case class Stats (minimumConeRatio: Double, iterations: Int)
+  }
+
+  // Given a ray and an SDF recursively evaluates the SDF until an intersection is either found or the limit of iterations is reached.
+  // Returns the distance along the ray to the first intersection.
+  def march (settings: March.Settings)(start: Double, end: Double, sdf: MaterialSDF, ray: Ray): March = {
+    @scala.annotation.tailrec def step (distanceCovered: Double, minConeRatio: Double, stepCount: Int, lastMaterial: Material.ID): March = stepCount match {
+      case currentStep if currentStep == settings.iterationLimit =>
+        // We've run out of marching steps and not found a sausage.  Perhaps we should assume we have hit something though,
+        // as normally when we run out of iteration steps we are close to something.
+        March (Some (distanceCovered, lastMaterial), settings, March.Stats (minConeRatio, settings.iterationLimit))
+      case _ =>
+        ((ray.position + ray.direction * distanceCovered) |> sdf) match {
+        case (nextStepSize, m) if nextStepSize < settings.tolerance =>
+          // Hit! `p` is within `settings.tolerance` being considered on the surface.
+          March (Some ((distanceCovered, m)), settings, March.Stats (minConeRatio, stepCount))
+        case (nextStepSize, m) =>
+          distanceCovered + nextStepSize match { // new distance along the ray
+            case newDistanceCovered if newDistanceCovered >= end =>
+              // We've marched out of the camera's view frustum.
+              March (None, settings, March.Stats (minConeRatio, stepCount))
+            case newDistanceCovered =>
+              val nextDistanceCovered = Math.max (settings.minimumStep, newDistanceCovered)
+              val newMinConeRatio = if (distanceCovered == 0.0) Double.MaxValue else Math.min (minConeRatio, nextStepSize / distanceCovered)
+              step (nextDistanceCovered, newMinConeRatio, stepCount + 1, m)
+          }
+        }
+    }
+    step (start, minConeRatio = Double.MaxValue, stepCount = 0, 0)
+  }
+}
+```
 
 ### Rasterization
 
@@ -142,12 +200,12 @@ Given a scene defined using SDFs and CSG the process of producing the image abov
 
 <img src="/docs/raster.png" width="600" style="float: right;" />
 
-Essentially to produce a rasterization of an SDF:
+To produce a rasterization of an SDF:
 
 * select a position for the camera.
 * draw a grid in front of the camera at an appropriate position to capture the required field of view.
-* each grid square corresponds to a pixel of the output rasterization.
-* send a ray (using sphere tracing) from the camera through the center of each grid square.
+* select an appropriate grid size, each grid square corresponds to a pixel of the output image.
+* send a ray (using sphere tracing) from the camera through the center of each grid square (storing the results).
 
 ## Rendering Techniques
 
@@ -155,14 +213,14 @@ The final render in this demo is a standard composition of multiple common datas
 
 ### Depth
 
-The simplest and most logical dataset to produce in this specific context; given a single signed distance function representing a scene, the z-buffer, by definition, is the natural rasterized representation of that signed distance field at a given camera location:
+The simplest and most logical dataset to produce from a scene SDF is the depth buffer as each SDF query yields a depth value.  Given a particular camera position and setup the rasterization of a scene SDF is naturally the depth buffer.
 
 
 | Depth buffer | Processing cost |
 |:---:|:---:|
 |<img src="/renders/render-02-depth.png" width="320" height="180" />|<img src="/renders/render-04-depth-steps.png" width="320" height="180" />|
 
-This dataset can be easily produced by sphere tracing the Scene SDF with a ray corresponding to each camera pixel.  The image to the right gives an indication of the cost of calculating the depth value for each pixel.
+This dataset can be easily produced by sphere tracing the scene SDF with a ray corresponding to each camera pixel.  The image to the right gives an indication of the cost of calculating the depth value for each pixel.
 
 ### Normals
 

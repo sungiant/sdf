@@ -22,7 +22,7 @@ object Program {
   type SDF = Vector => Double
   type MaterialSDF = Vector => (Double, Material.ID) // how far to the nearest object, and what material is it?
 
-  // Configuration
+  // Configuration 
   //------------------------------------------------------------------------------------------------------------------//
   val EPSILON = 0.0001
 
@@ -216,31 +216,42 @@ object Program {
   //------------------------------------------------------------------------------------------------------------------//
   object Algorithm {
 
-    // d: distance to surface intersection (if intersection was found) from star of ray.
+    // distance: distance to surface intersection (if intersection was found) from start of ray.
     case class March (distance: Option[(Double, Material.ID)], settings: March.Settings, stats: March.Stats)
 
     object March {
       case class Settings (iterationLimit: Int, minimumStep: Double, tolerance: Double)
       object Settings { lazy val default = Settings (256, 0.001, 0.0001) }
 
-      // m: the minimum result of the ratio of all individual sdf results along the march over the distance covered at that point.
-      // i: number of iterations performed
+      // minimumConeRatio: the minimum result of the ratio of all individual sdf results along the march over the distance covered at that point.
+      // iterations: number of iterations performed
       case class Stats (minimumConeRatio: Double, iterations: Int)
     }
 
-    // Given a ray and an SDF recursively evaluates the SDF until an interestion is either found or the limit of iterations is reached.
-    // Returns the distance along the ray to the first interesection.
+    // Given a ray and an SDF recursively evaluates the SDF until an intersection is either found or the limit of iterations is reached.
+    // Returns the distance along the ray to the first intersection.
     def march (settings: March.Settings)(start: Double, end: Double, sdf: MaterialSDF, ray: Ray): March = {
       @scala.annotation.tailrec def step (distanceCovered: Double, minConeRatio: Double, stepCount: Int, lastMaterial: Material.ID): March = stepCount match {
-        case currentStep if currentStep == settings.iterationLimit => March (Some (distanceCovered, lastMaterial), settings, March.Stats (minConeRatio, settings.iterationLimit)) // We've run out of marching steps and not found a sausage.  Perhaps we should assume we have hit something though, as normally when we run out of iteration steps we are close to something.
-        case _ => ((ray.position + ray.direction * distanceCovered) |> sdf) match {
-          case (nextStepSize, m) if nextStepSize < settings.tolerance => March (Some ((distanceCovered, m)), settings, March.Stats (minConeRatio, stepCount)) // Hit! `p` is within `settings.tolerance` being considered on the surface.
-          case (nextStepSize, m) => distanceCovered + nextStepSize match { // new distance along the ray
-            case newDistanceCovered if newDistanceCovered >= end => March (None, settings, March.Stats (minConeRatio, stepCount)) // We've marched out of the camera's view frustum.
-            case newDistanceCovered =>
-              val nextDistanceCovered = Math.max (settings.minimumStep, newDistanceCovered)
-              val newMinConeRatio = if (distanceCovered == 0.0) Double.MaxValue else Math.min (minConeRatio, nextStepSize / distanceCovered)
-              step (nextDistanceCovered, newMinConeRatio, stepCount + 1, m) }}
+        case currentStep if currentStep == settings.iterationLimit =>
+          // We've run out of marching steps and not found a sausage.  Perhaps we should assume we have hit something though,
+          // as normally when we run out of iteration steps we are close to something.
+          March (Some (distanceCovered, lastMaterial), settings, March.Stats (minConeRatio, settings.iterationLimit))
+        case _ =>
+          ((ray.position + ray.direction * distanceCovered) |> sdf) match {
+          case (nextStepSize, m) if nextStepSize < settings.tolerance =>
+            // Hit! `p` is within `settings.tolerance` being considered on the surface.
+            March (Some ((distanceCovered, m)), settings, March.Stats (minConeRatio, stepCount))
+          case (nextStepSize, m) =>
+            distanceCovered + nextStepSize match { // new distance along the ray
+              case newDistanceCovered if newDistanceCovered >= end =>
+                // We've marched out of the camera's view frustum.
+                March (None, settings, March.Stats (minConeRatio, stepCount))
+              case newDistanceCovered =>
+                val nextDistanceCovered = Math.max (settings.minimumStep, newDistanceCovered)
+                val newMinConeRatio = if (distanceCovered == 0.0) Double.MaxValue else Math.min (minConeRatio, nextStepSize / distanceCovered)
+                step (nextDistanceCovered, newMinConeRatio, stepCount + 1, m)
+            }
+          }
       }
       step (start, minConeRatio = Double.MaxValue, stepCount = 0, 0)
     }
