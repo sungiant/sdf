@@ -32,9 +32,9 @@ Scala                            1             96             97            565
 
 The process of generating the image above is based on the combination of the following concepts:
 
-### Constructive Solid Geometery
+### Constructive Solid Geometry
 
-Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practicle way to represent CSG objects is with a binary tree - with leaves representing primitives and nodes representing operations.
+Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practical way to represent CSG objects is with a binary tree - with leaves representing primitives and nodes representing operations.
 
 <img src="/docs/csg.png" style="float: right;" />
 
@@ -74,7 +74,7 @@ Another mechanism for constructing a queryable signed distance field is with pur
 
 * `p` = `(0.0, 0.75, 0.0)` => inside the unit sphere, value: `-0.25`
 * `p` = `(0.0, 1.25, 0.0)` => outside the unit sphere, value: `0.25`
-* `p` = `(1.0, 1.0, 1.0)` => on the surface of unit sphere, value: `0.0`
+* `p` = `(1.0, 1.0, 1.0)` => on the surface of the unit sphere, value: `0.0`
 * `p` = `(0.4, 0.0, 0.3)` => inside the unit sphere, value: `-0.5`
 
 In this case it is clear that the results are directly related to the magnitude of `p`.
@@ -85,7 +85,7 @@ More complex and flexible shapes can be defined with more complex equations.
 
 For example, a very simple extension to the above would be to generalise the equation to work with spheres, again centered at the origin, but additionally of any radius: `f (p): SQRT (p.x*p.x + p.y*p.y + p.z*p.z) - RADIUS`.
 
-The follow code snippet shows this demo's alegbraic implementations of various signed distance fields:
+The following code snippet shows this demo's algebraic implementations of various signed distance fields:
 
 ```
 // Signed distance function for a unit sphere (radius = 1).
@@ -128,25 +128,26 @@ def evaluate (scene: CSG.Tree): SDF = {
 ```
 
 ### Sphere Tracing SDFs
+
 This is particularly interesting and is achived through a technique known as ray-marching, in our case a particular specialisation known as sphere tracing.  Here's how it works:
 
 
-
+...
 
 
 
 ### Rasterization
 
-Given a scene defined using SDFs and CSG the process of producing the image above is acheived by rasterizing the information availble into the pixels.  This is achived using the sphere tracing method decribed above once for each pixel of the final image.
+Given a scene defined using SDFs and CSG the process of producing the image above is done by rasterizing the information available into the pixels  using the sphere tracing method described above once for each pixel of the final image.
 
-<img src="/docs/raster.png" style="float: right;" />
+<img src="/docs/raster.png" width="600" style="float: right;" />
 
 Essentially to produce a rasterization of an SDF:
 
 * select a position for the camera.
 * draw a grid in front of the camera at an appropriate position to capture the required field of view.
 * each grid square corresponds to a pixel of the output rasterization.
-* send a ray (using sphere tracing) from the camera though the center of each grid square.
+* send a ray (using sphere tracing) from the camera through the center of each grid square.
 
 ## Rendering Techniques
 
@@ -154,14 +155,14 @@ The final render in this demo is a standard composition of multiple common datas
 
 ### Depth
 
-The simplest and most logial dataset to produce in this specific context; given a single signed distance function reperesenting a scene, the z-buffer, by defintion, is the natural rasterized representation of that signed distance field at a given camera location:
+The simplest and most logical dataset to produce in this specific context; given a single signed distance function representing a scene, the z-buffer, by definition, is the natural rasterized representation of that signed distance field at a given camera location:
 
 
 | Depth buffer | Processing cost |
 |:---:|:---:|
 |<img src="/renders/render-02-depth.png" width="320" height="180" />|<img src="/renders/render-04-depth-steps.png" width="320" height="180" />|
 
-This dataset can be easily produced by sphere tracing the Scene SDF with a ray corresponding to each camera pixel.  The image to the right gives an indication of the cost of calculting the depth value for each pixel.
+This dataset can be easily produced by sphere tracing the Scene SDF with a ray corresponding to each camera pixel.  The image to the right gives an indication of the cost of calculating the depth value for each pixel.
 
 ### Normals
 
@@ -191,7 +192,7 @@ In this demo the signed distance function used to represent the scene is compose
 |:---:|
 |<img src="/renders/render-01-albedo.png" width="320" height="180" />|
 
-Augmenting the signature of the SDF such that, in addition to returning a depth value, a material identifier associated with the object at the given location is also returned can be used in conjuction with an augumented version of the function above to support CSG composition of objects with material associations.  The following snippet shows how the CSG evaluation function can be adjusted:
+Augmenting the signature of the SDF such that, in addition to returning a depth value, a material identifier associated with the object at the given location is also returned can be used in conjunction with an augmented version of the function above to support CSG composition of objects with material associations.  The following snippet shows how the CSG evaluation function can be adjusted:
 
 ```
 type MaterialSDF = Vector => (Double, Material.ID)
@@ -222,8 +223,7 @@ def evaluate (scene: CSG.Tree): MaterialSDF = {
 }
  ```
 
-This technique makes it easy to assign material idenfiers to simple SDF shapes and then compose them in the conventional manner using CSG.
-
+This technique makes it easy to assign material identifiers to simple SDF shapes and then compose them in the conventional manner using CSG.
 
 ### Shadows
 
@@ -250,7 +250,7 @@ This technique makes it easy to assign material idenfiers to simple SDF shapes a
 
 ### Lighting
 
-The lighting technique used in the demo is simply an application of the Phong lighting model.  The input data required to apply the Phong lighting model is limited to surface positions, surface normals, material properties and camera location; all required input data is easily derived from calculations used and descibed already, as such, when it comes to this particular lighting technique, there is no relevance or change in approach needed due to the demo scene being defined as a SDF.
+The lighting technique used in the demo is simply an application of the Phong lighting model.  The input data required to apply the Phong lighting model is limited to surface positions, surface normals, material properties and camera location; all required input data is easily derived from calculations used and described already, as such, when it comes to this particular lighting technique, there is no relevance or change in approach needed due to the demo scene being defined as a SDF.
 
 | Ambient component | Diffuse component | Specular component |
 |:---:|:---:|:---:|
