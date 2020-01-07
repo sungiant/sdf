@@ -301,7 +301,7 @@ Calculating shadows in this context is surprisingly straightforward.  For each p
 |:---:|:---:|
 |<img src="/renders/render-06-shadow-hard.png" width="320" height="180" />|<img src="/renders/render-08-shadow-steps.png" width="320" height="180" />|
 
-Soft shadows are also straightforward, albeit they require keeping track of additional data whilst sphere tracing the rays to the light sources.  The particular data needed is the minimum cone ratio observed whilst sphere tracing.  The cone ratio can be calculated each iteration as the ratio of the step size over the total distance covered.  The minimum observed result is then directly proportional to the soft shadow penumbra.  Ignation Quilezles does a great job of explaining this in detail [here](https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm).
+Soft shadows are also straightforward, albeit they require keeping track of additional data whilst sphere tracing the rays to the light sources.  The particular data needed is the minimum cone ratio observed whilst sphere tracing.  The cone ratio can be calculated each iteration as the ratio of the step size over the total distance covered.  The minimum observed result is then directly proportional to the soft shadow penumbra.  Iñigo Quilez does a great job of explaining this in detail [here](https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm).
 
 | Soft Shadows |
 |:---:|
@@ -362,7 +362,7 @@ The final image is a composition, using varied blending techniques, of the data 
 
 ## References
 
-* [Ignation Quilezles' Homepage](https://www.iquilezles.org/www/index.htm)
+* [Iñigo Quilez' Homepage](https://www.iquilezles.org/www/index.htm)
 * [Jamie Wong, Ray marching signed distance functions](http://jamie-wong.com/2016/07/15/ray-marching-signed-distance-functions/)
 * [Alex Benton, Ray marching and signed distance fields](http://bentonian.com/Lectures/FGraphics1819/1.%20Ray%20Marching%20and%20Signed%20Distance%20Fields.pdf)
 * [9-bit Science, Raymarching distance fields](http://9bitscience.blogspot.com/2013/07/raymarching-distance-fields_14.html)
