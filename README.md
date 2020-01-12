@@ -72,7 +72,7 @@ Another mechanism for constructing a queryable signed distance field is with pur
 
 * `p` = `(0.0, 0.75, 0.0)` => inside the unit sphere, value: `-0.25`
 * `p` = `(0.0, 1.25, 0.0)` => outside the unit sphere, value: `0.25`
-* `p` = `(1.0, 1.0, 1.0)` => on the surface of the unit sphere, value: `0.0`
+* `p` = `(sin(π/4), sin(π/4), sin(π/4))` => on the surface of the unit sphere, value: `0.0`
 * `p` = `(0.4, 0.0, 0.3)` => inside the unit sphere, value: `-0.5`
 
 In this case it is clear that the results are directly related to the magnitude of `p`.
