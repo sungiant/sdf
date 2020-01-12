@@ -70,10 +70,11 @@ Signed distance fields are often used in modern game engines where a discrete sa
 
 Another mechanism for constructing a queryable signed distance field is with pure algebra.  Take for example the surface of a [unit sphere](https://en.wikipedia.org/wiki/Unit_sphere) and consider the results that a signed distance field query should yield for the following input points:
 
-* `p` = `(0.0, 0.75, 0.0)` => inside the unit sphere, value: `-0.25`
-* `p` = `(0.0, 1.25, 0.0)` => outside the unit sphere, value: `0.25`
-* `p` = `(sin(π/4), sin(π/4), sin(π/4))` => on the surface of the unit sphere, value: `0.0`
-* `p` = `(0.4, 0.0, 0.3)` => inside the unit sphere, value: `-0.5`
+* `p` = `(0.00, 0.75, 0.00)` => inside the unit sphere, value: `-0.25`
+* `p` = `(0.00, 1.25, 0.00)` => outside the unit sphere, value: `0.25`
+* `p` = `(0.00, 1.00, 0.00)` => on the surface of the unit sphere, value: `0.0`
+* `p` = `(0.00, 1.00, 0.00)` => on the surface of the unit sphere, value: `0.0`
+* `p` = `(0.40, 0.00, 0.30)` => inside the unit sphere, value: `-0.5`
 
 In this case it is clear that the results are directly related to the magnitude of `p`.
 
