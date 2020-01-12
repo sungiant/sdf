@@ -73,7 +73,6 @@ Another mechanism for constructing a queryable signed distance field is with pur
 * `p` = `(0.00, 0.75, 0.00)` => inside the unit sphere, value: `-0.25`
 * `p` = `(0.00, 1.25, 0.00)` => outside the unit sphere, value: `0.25`
 * `p` = `(0.00, 1.00, 0.00)` => on the surface of the unit sphere, value: `0.0`
-* `p` = `(0.00, 1.00, 0.00)` => on the surface of the unit sphere, value: `0.0`
 * `p` = `(√1/3, √1/3, √1/3)` => on the surface of the unit sphere, value: `0.0`
 * `p` = `(√1/2, 0.00, √1/2)` => on the surface of the unit sphere, value: `0.0`
 * `p` = `(0.40, 0.00, 0.30)` => inside the unit sphere, value: `-0.5`
