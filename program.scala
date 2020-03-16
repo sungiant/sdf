@@ -7,7 +7,9 @@ object Program {
   // Basic Type Definitions
   //------------------------------------------------------------------------------------------------------------------//
   case class Ray   (position: Vector, direction: Vector)
-  case class PointLight (position: Vector, colour: Colour, range: Double, castsShadows: Boolean)
+  case class PointLight (position: Vector, colour: Colour, range: Double, shadowFactor: Double) {
+    def attenuationAt (point: Vector) = range / (1.0 + Math.pow ((position - point).length, 2))
+  }
 
   case class Material (albedo: Colour, shininess: Double)
   object Material {
@@ -26,6 +28,7 @@ object Program {
   //------------------------------------------------------------------------------------------------------------------//
   val EPSILON = 0.0001
   val GAMMA = 2.2
+  val SHADOW_K = 10.0
 
   // Utility functions
   //------------------------------------------------------------------------------------------------------------------//
@@ -91,9 +94,10 @@ object Program {
       fov, aspect, near, far)
 
     def createLighting (): List[PointLight] = // Todo: Add support for point and spot lighting.
-      PointLight (Vector (6, 8, 2), Colour (255, 180, 0), 10.0, true) ::
-      PointLight (Vector (-3, 1.2, 5), Colour (72, 31, 101), 10.0, true) ::
-      PointLight (Vector (0, 0, 0), Colour (255, 255, 255), 5.0, true) ::
+      PointLight (Vector (6, 8, 2), Colour (255, 180, 0), 18.0, 1.0) ::
+      PointLight (Vector (-3, 1.2, 5), Colour (72, 31, 101), 16.0, 1.0) ::
+      PointLight (Vector (0, 0, 0), Colour (82, 82, 82), 2.3, 0.7) ::
+      PointLight (Vector (3, 3, 0), Colour (255, 255, 255), 12.0, 1.0) ::
       Nil
 
     def createEdits (): CSG.Tree = CSG.Tree (ground, boxes, shape, debris)
@@ -107,8 +111,6 @@ object Program {
       5 -> Material (Colour.persimmon, 10.0),
       6 -> Material (Colour.vermillion, 20.0))
 
-    def createDocsEditsList (): List[CSG.Tree] = shape_a :: shape_b :: shape_c :: shape_d :: shape_e :: shape_ab :: shape_de :: shape_cde :: shape :: Nil
-
     // Clearly seperated for docs CSG example
     private lazy val shape_a = CSG.Tree (SDF.cube (Vector.zero, 1.9) _, 3)
     private lazy val shape_b = CSG.Tree (SDF.sphere (Vector.zero, 1.2) _, 3)
@@ -119,10 +121,6 @@ object Program {
     private lazy val shape_c = CSG.Tree (SDF.cuboid (Vector.zero, Vector (2.2, 0.7, 0.7)) _, 3)
     private lazy val shape_d = CSG.Tree (SDF.cuboid (Vector.zero, Vector (0.7, 2.2, 0.7)) _, 3)
     private lazy val shape_e = CSG.Tree (SDF.cuboid (Vector.zero, Vector (0.7, 0.7, 2.2)) _, 3)
-
-    //private lazy val shape_c = CSG.Tree (SDF.cylinder (Vector.zero, 0.5, Vector (-2.0, 0.0, 0.0), Vector (2.0, 0.0, 0.0)) _, 3)
-    //private lazy val shape_d = CSG.Tree (SDF.cylinder (Vector.zero, 0.5, Vector (0.0, -2.0, 0.0), Vector (0.0, 2.0, 0.0)) _, 3)
-    //private lazy val shape_e = CSG.Tree (SDF.cylinder (Vector.zero, 0.5, Vector (0.0, 0.0, -2.0), Vector (0.0, 0.0, 2.0)) _, 3)
 
     private lazy val shape_ab = CSG.Tree (CSG.Op.Intersection, shape_a, shape_b)
     private lazy val shape_de = CSG.Tree (CSG.Op.Union, shape_d, shape_e)
@@ -271,11 +269,10 @@ object Program {
       val ambientColour = Vector (0.2, 0.2, 0.2)  // HARDCODED
       val specularColour = Vector.one             // HARDCODED
       val result = lights.foldLeft ((Vector.zero, Vector.zero)) { (a, i) =>
-        val surfaceToLight = i.position - surfacePosition;
-        val attenuation = i.range / (1.0 + Math.pow (surfaceToLight.length, 2))
+        val attenuation = i.attenuationAt (surfacePosition)
         val lightColour = i.colour.toVector01
         val N = surfaceNormal
-        val L = surfaceToLight.normalise
+        val L = (i.position - surfacePosition).normalise
         val V = (eyePosition - surfacePosition).normalise
         val R = Vector.reflect (-L, N).normalise
         val dotLN = Vector.dot (L, N)
@@ -402,48 +399,45 @@ object Program {
       def process (input: Input) = {
         // In this context 0.0 means no shadows and 1.0 means shadows.
         val settings = Algorithm.March.Settings.default
-        val shadowCastingLights = input.lighting.collect { case l if l.castsShadows => l }
-        lazy val insensityOfAllShadowCastingLights = shadowCastingLights.map { l => l.colour.toVector01.length }.sum
-        case class R (hardShadow: Boolean, softShadow: Double, iterations: Int)
-        val intermediateResults: List[(Double, IndexedSeq[R])] = shadowCastingLights.map { light =>
-          val lightIntensity = light.colour.toVector01.length
-          val results = (0 until input.depthPass.input.h * input.depthPass.input.w).map { i =>
+        
+
+        case class R (hardShadow: Double, softShadow: Double, iterations: Int)
+        val result = (0 until input.depthPass.input.h * input.depthPass.input.w)
+          .map { i =>
             input.depthPass.surfacePosition (i) match {
-              case None => R (false, 0.0, 0)
-              case Some (p) => {
-                val surfaceToLight = light.position - p;
-                val surfaceToLightRay = Ray (p, surfaceToLight.normalise)
-                val start = 10.0 * settings.tolerance
-                val distanceToEnd = (light.position - p).length - start
-                Algorithm.march (settings)(start, distanceToEnd, input.depthPass.input.sdf, surfaceToLightRay) match {
-                  case Algorithm.March (Some (_), _, stats) =>
-                    R (true, 1.0, stats.iterations)
-                  case Algorithm.March (None, _, stats) =>
-                    val k = 2.0; val z = stats.minimumConeRatio * k // https://iquilezles.org/www/articles/rmshadows/rmshadows.htm
-                    val softShadow = 1.0 - clamp01 (z)
-                    R (false, softShadow, stats.iterations)
-                  case _ =>
-                    R (false, 0.0, 0)
+              case None => R (0.0, 0.0, 0)
+              case Some (surfacePosition) =>
+                val shadowCastingLights = input.lighting.collect { case l if l.shadowFactor > EPSILON => l }
+                lazy val insensityOfAllShadowCastingLights = shadowCastingLights.map { l =>
+                  val attenuation = l.attenuationAt (surfacePosition)
+                  l.colour.toVector01.length * attenuation * l.shadowFactor
+                }.sum
+
+                shadowCastingLights.map { light =>
+                  val attenuation = light.attenuationAt (surfacePosition)
+                  val surfaceToLight = light.position - surfacePosition
+                  val surfaceToLightRay = Ray (surfacePosition, surfaceToLight.normalise)
+                  val start = 10.0 * settings.tolerance
+                  val distanceToEnd = (light.position - surfacePosition).length - start
+                  val intensity = light.colour.toVector01.length
+                  val shadowResult = intensity * attenuation * light.shadowFactor / insensityOfAllShadowCastingLights;
+                  Algorithm.march (settings)(start, distanceToEnd, input.depthPass.input.sdf, surfaceToLightRay) match {
+                    case Algorithm.March (Some (_), _, stats) =>
+                      R (shadowResult, shadowResult, stats.iterations)
+                    case Algorithm.March (None, _, stats) =>
+                      val z = stats.minimumConeRatio * SHADOW_K // https://iquilezles.org/www/articles/rmshadows/rmshadows.htm
+                      val softShadow = 1.0 - clamp01 (z)
+                      R (0.0, softShadow * shadowResult, stats.iterations)
+                    case _ =>
+                      R (0.0, 0.0, 0)
+                  }
                 }
-              }
+                .foldLeft (R (0.0, 0.0, 0)) { case (a, i) =>
+                  R (a.hardShadow + i.hardShadow, a.softShadow + i.softShadow, a.iterations + i.iterations)
+                }
             }
           }
-          (lightIntensity, results)
-        }
-
-        case class R2 (hardShadow: Double, softShadow: Double, iterations: Int)
-        val start: IndexedSeq[R2] = List.fill (intermediateResults (0)._2.size)(R2 (0.0, 0.0, 0)).toIndexedSeq
-        val results = intermediateResults.foldLeft (start) { case (a, (li, ri)) =>
-          ri.zipWithIndex.map { case (r, idx) => R2 (
-            a (idx).hardShadow + ((if (r.hardShadow) 1.0 else 0.0) * li / insensityOfAllShadowCastingLights),
-            a (idx).softShadow + (r.softShadow * li / insensityOfAllShadowCastingLights),
-            a (idx).iterations + r.iterations)
-          }
-        }
-        ShadowPass (input, Output (
-          results.map (x => x.hardShadow),
-          results.map (_.softShadow)),
-        Stats (results.map (_ => 0.0), results.map (_.iterations), settings.iterationLimit))
+        ShadowPass (input, Output (result.map (_.hardShadow), result.map (_.softShadow)), Stats (result.map (_ => 0.0), result.map (_.iterations), settings.iterationLimit))
       }
     }
 
