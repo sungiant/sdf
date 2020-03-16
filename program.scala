@@ -7,7 +7,7 @@ object Program {
   // Basic Type Definitions
   //------------------------------------------------------------------------------------------------------------------//
   case class Ray   (position: Vector, direction: Vector)
-  case class DirectionalLight (position: Vector, colour: Colour, castsShadows: Boolean)
+  case class PointLight (position: Vector, colour: Colour, range: Double, castsShadows: Boolean)
 
   case class Material (albedo: Colour, shininess: Double)
   object Material {
@@ -25,6 +25,7 @@ object Program {
   // Configuration 
   //------------------------------------------------------------------------------------------------------------------//
   val EPSILON = 0.0001
+  val GAMMA = 2.2
 
   // Utility functions
   //------------------------------------------------------------------------------------------------------------------//
@@ -89,9 +90,10 @@ object Program {
       Quaternion.fromYawPitchRoll (5.0 * math.Pi / 4.0, (math.Pi / 2.0) - ((Math.sqrt (zx * zx * 2.0) / y) |> Math.atan), 0.0),
       fov, aspect, near, far)
 
-    def createLighting (): List[DirectionalLight] = // Todo: Add support for point and spot lighting.
-      DirectionalLight (Vector (-1, 1.5, 5), Colour (128, 192, 192), true) ::
-      DirectionalLight (Vector (6, 8, 2), Colour (192, 128, 128), true) ::
+    def createLighting (): List[PointLight] = // Todo: Add support for point and spot lighting.
+      PointLight (Vector (6, 8, 2), Colour (255, 180, 0), 10.0, true) ::
+      PointLight (Vector (-3, 1.2, 5), Colour (72, 31, 101), 10.0, true) ::
+      PointLight (Vector (0, 0, 0), Colour (255, 255, 255), 5.0, true) ::
       Nil
 
     def createEdits (): CSG.Tree = CSG.Tree (ground, boxes, shape, debris)
@@ -263,22 +265,25 @@ object Program {
       sdf (Vector (pos.x, pos.y, pos.z + NORM_SAMPLE)) - sdf (Vector (pos.x, pos.y, pos.z - NORM_SAMPLE))).normalise }
 
     case class PhongReflection (ambient: Vector, diffuse: Vector, specular: Vector)
-    def phong (surfacePosition: Vector, surfaceNormal: Vector, eyePosition: Vector, lights: List[DirectionalLight],
+    def phong (surfacePosition: Vector, surfaceNormal: Vector, eyePosition: Vector, lights: List[PointLight],
       material: Material): PhongReflection = {
+
       val ambientColour = Vector (0.2, 0.2, 0.2)  // HARDCODED
       val specularColour = Vector.one             // HARDCODED
       val result = lights.foldLeft ((Vector.zero, Vector.zero)) { (a, i) =>
+        val surfaceToLight = i.position - surfacePosition;
+        val attenuation = i.range / (1.0 + Math.pow (surfaceToLight.length, 2))
         val lightColour = i.colour.toVector01
         val N = surfaceNormal
-        val L = (i.position - surfacePosition).normalise
+        val L = surfaceToLight.normalise
         val V = (eyePosition - surfacePosition).normalise
         val R = Vector.reflect (-L, N).normalise
         val dotLN = Vector.dot (L, N)
         val dotRV = Vector.dot (R, V)
         val contribution =
           if (dotLN < 0.0) (Vector.zero, Vector.zero)
-          else if (dotRV < 0.0 || material.shininess <= 0.0) (lightColour * dotLN, Vector.zero)
-          else (lightColour * dotLN, lightColour * specularColour * Math.pow (dotRV, material.shininess))
+          else if (dotRV < 0.0 || material.shininess <= 0.0) (lightColour * dotLN * attenuation, Vector.zero)
+          else (lightColour * dotLN * attenuation, lightColour * specularColour * Math.pow (dotRV, material.shininess) * attenuation)
         // Currently the contribution each light source is simply additive to the result.
         (a._1 + contribution._1, a._2 + contribution._2)
       }
@@ -377,7 +382,7 @@ object Program {
     //----------------------------------------------------------------------------------------------------------------//
     case class ShadowPass (input: ShadowPass.Input, output: ShadowPass.Output, stats: ShadowPass.Stats) extends Pass { lazy val view = ShadowPass.View (this) }
     object ShadowPass {
-      case class Input  (depthPass: DepthPass, lighting: List[DirectionalLight]) extends Pass.Input 
+      case class Input  (depthPass: DepthPass, lighting: List[PointLight]) extends Pass.Input 
       case class Output (hardShadows: IndexedSeq[Double], softShadows: IndexedSeq[Double]) extends Pass.Output 
       case class Stats  (minimumConeRatio: IndexedSeq[Double], iterations: IndexedSeq[Int], iterationLimit: Int) extends Pass.Stats
       case class View   (private val raw: ShadowPass) extends Pass.View {
@@ -392,7 +397,7 @@ object Program {
         def minimumConeRatio  (x: Int, y: Int)  = raw.stats.minimumConeRatio (x + y * width)
       }
 
-      def apply (depthPass: DepthPass, lighting: List[DirectionalLight]): ShadowPass = time ("shadow-pass") { Input (depthPass, lighting) |> process }
+      def apply (depthPass: DepthPass, lighting: List[PointLight]): ShadowPass = time ("shadow-pass") { Input (depthPass, lighting) |> process }
 
       def process (input: Input) = {
         // In this context 0.0 means no shadows and 1.0 means shadows.
@@ -406,7 +411,8 @@ object Program {
             input.depthPass.surfacePosition (i) match {
               case None => R (false, 0.0, 0)
               case Some (p) => {
-                val surfaceToLightRay = Ray (p,  (light.position - p).normalise)
+                val surfaceToLight = light.position - p;
+                val surfaceToLightRay = Ray (p, surfaceToLight.normalise)
                 val start = 10.0 * settings.tolerance
                 val distanceToEnd = (light.position - p).length - start
                 Algorithm.march (settings)(start, distanceToEnd, input.depthPass.input.sdf, surfaceToLightRay) match {
@@ -483,7 +489,7 @@ object Program {
     //----------------------------------------------------------------------------------------------------------------//
     case class LightingPass (input: LightingPass.Input, output: LightingPass.Output, stats: LightingPass.Stats) extends Pass { lazy val view = LightingPass.View (this) }
     object LightingPass {
-      case class Input  (depthPass: DepthPass, normalsPass: NormalsPass, lighting: List[DirectionalLight]) extends Pass.Input 
+      case class Input  (depthPass: DepthPass, normalsPass: NormalsPass, lighting: List[PointLight]) extends Pass.Input 
       // Lighting data in this output structure is not clamped between 0.0 and 1.0, as each light additively contributes to the results,
       // all that is know is that components will be >= 0.
       case class Output (ambient: IndexedSeq[Vector], diffuse: IndexedSeq[Vector], specular: IndexedSeq[Vector]) extends Pass.Output 
@@ -495,7 +501,7 @@ object Program {
         def specularValue (x: Int, y: Int)      = raw.output.specular (x + y * width)
       }
 
-      def apply (depthPass: DepthPass, normalsPass: NormalsPass, lighting: List[DirectionalLight]): LightingPass = time ("lighting-pass") { Input (depthPass, normalsPass, lighting) |> process }
+      def apply (depthPass: DepthPass, normalsPass: NormalsPass, lighting: List[PointLight]): LightingPass = time ("lighting-pass") { Input (depthPass, normalsPass, lighting) |> process }
 
       def process (input: Input) = {
         val results = (0 until input.depthPass.input.h * input.depthPass.input.w).map { i =>
@@ -544,6 +550,7 @@ object Program {
 
     def depthCone (p: DepthPass.View) = { (x: Int, y: Int) =>
       Colour.fromRange (p.minimumConeRatio (x, y), p.minimumConeRatioLowerBound, p.minimumConeRatioUpperBound)
+
     } |> process (p) 
 
     // Geometric compositions
@@ -617,7 +624,10 @@ object Program {
             //val hardShadowMultiplier = (1.0 - shadowPass.hardShadowValue (x, y)) * shadowFactor
             //val res = lighting * aoMultiplier * hardShadowMultiplier
             val res = lighting * aoMultiplier * softShadowMultiplier
-            Colour.fromVector01 (Vector (clamp01 (res.x), clamp01 (res.y), clamp01 (res.z)))
+
+            val gamma_correction = Vector (Math.pow (res.x, 1.0 / GAMMA), Math.pow (res.y, 1.0 / GAMMA), Math.pow (res.z, 1.0 / GAMMA))
+
+            Colour.fromVector01 (Vector (clamp01 (gamma_correction.x), clamp01 (gamma_correction.y), clamp01 (gamma_correction.z)))
 
             }
           }
