@@ -211,7 +211,7 @@ object Algorithm {
 
 Given a scene defined using SDFs and CSG the process of producing an image is done by rasterizing the information available into pixels using the sphere tracing method described above once for each pixel of the final image.
 
-<img src="/docs/raster.png" width="600" style="float: right;" />
+<img src="/docs/raster.png" width="600" />
 
 To produce a rasterization of an SDF:
 
