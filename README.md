@@ -36,7 +36,7 @@ The process of generating the image above is based on the combination of the fol
 
 Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practical way to represent CSG objects is with a binary tree - leaves representing primitives and nodes representing operations.
 
-<img src="/docs/csg.png" style="float: right;" />
+<img src="/docs/csg.png" width="100%" />
 
 The following code snippet shows how CSG trees are implemented within this demo:
 
@@ -153,7 +153,7 @@ Ray constrained SDF queries are essential for working with SDFs and be calculate
 * Finally sum all results to produce the final depth value.
 * Additionally, if the number of steps taken exceeds an abitary predefined threshold, stop the process and assume that the ray does not intersect a suface.
 
-<img src="/docs/sphere_tracing.png" style="float: right;" />
+<img src="/docs/sphere_tracing.png" width="100%" />
 
 The following code sample shows the part of this demo that implements the sphere tracing algorithm (along with some extra stat tracking that'll be used later):
 
