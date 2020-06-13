@@ -1,11 +1,11 @@
 # Sphere tracing signed distance functions
 
 [![Build Status](https://travis-ci.org/sungiant/sdf.png?branch=master)][travis]
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)][license]
+[![License](https://img.shields.io/github/license/sungiant/sdf)][license]
 
 This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance functions.
 
-The renderer is written specifically to run exclusively on the CPU instead of the GPU so as to best illustrate the entire rendering pipeline as clearly and concisely as possible.
+The renderer is written specifically to run exclusively on the CPU instead of the GPU so as to best illustrate the entire rendering pipeline with zero dependencies as clearly and concisely as possible (find my real-time GPU version [here][realtime]).
 
 When run, the program produces this image (writing it to disk in PNG format):
 
@@ -36,7 +36,7 @@ The process of generating the image above is based on the combination of the fol
 
 Constructive solid geometry is the technique of using boolean operators to combine geometrical objects.  A practical way to represent CSG objects is with a binary tree - leaves representing primitives and nodes representing operations.
 
-<img src="/docs/csg.png" width="100%" />
+<img src="/docs/csg.png" width="640px" />
 
 The following code snippet shows how CSG trees are implemented within this demo:
 
@@ -153,7 +153,7 @@ Ray constrained SDF queries are essential for working with SDFs and be calculate
 * Finally sum all results to produce the final depth value.
 * Additionally, if the number of steps taken exceeds an abitary predefined threshold, stop the process and assume that the ray does not intersect a suface.
 
-<img src="/docs/sphere_tracing.png" width="100%" />
+<img src="/docs/sphere_tracing.png" width="640px" />
 
 The following code sample shows the part of this demo that implements the sphere tracing algorithm (along with some extra stat tracking that'll be used later):
 
@@ -211,7 +211,7 @@ object Algorithm {
 
 Given a scene defined using SDFs and CSG the process of producing an image is done by rasterizing the information available into pixels using the sphere tracing method described above once for each pixel of the final image.
 
-<img src="/docs/raster.png" width="600" />
+<img src="/docs/raster.png" width="480" />
 
 To produce a rasterization of an SDF:
 
@@ -247,7 +247,7 @@ def estimateNormal (pos: Vector, sdf: SDF) = Vector (
   sdf (Vector (pos.x, pos.y, pos.z + NORM_SAMPLE)) - sdf (Vector (pos.x, pos.y, pos.z - NORM_SAMPLE))).normalise
 ```
 
-| Normals buffer |
+| Normals |
 |:---:|
 |<img src="/renders/render-05-normals.png" width="320" height="180" />|
 
@@ -258,7 +258,7 @@ This technique introduces, for each pixel representing a surface, a performance 
 
 In this demo the signed distance function used to represent the scene is composed of multiple signed distance functions using constructive solid geometry.  By augmenting the signature of a standard signed distance function it is possible to introduce per object material identification data, which can then be used to produce buffers like this Albedo buffer:
 
-| Albedo buffer |
+| Albedo |
 |:---:|
 |<img src="/renders/render-01-albedo.png" width="320" height="180" />|
 
@@ -375,14 +375,7 @@ The final image is a composition, using varied blending techniques, of the data 
 
 This software is licensed under the **[MIT License][license]**; you may not use this software except in compliance with the License.
 
-```
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
-
 [travis]: https://travis-ci.org/sungiant/sdf
 [license]: https://raw.githubusercontent.com/sungiant/sdf/master/LICENSE
+[realtime]: https://github.com/sungiant/sge/tree/dev2/examples/ex03_staticsdf
 
