@@ -1,6 +1,6 @@
 # Sphere tracing signed distance functions
 
-[![Build Status](https://travis-ci.org/sungiant/sdf.png?branch=master)][travis]
+[![Build Status](https://img.shields.io/travis/sungiant/sdf)][travis]
 [![License](https://img.shields.io/github/license/sungiant/sdf)][license]
 
 This stand-alone repository illustrates the basics of both the sphere tracing method of ray marching and constructive solid geometry modelling with signed distance functions.
