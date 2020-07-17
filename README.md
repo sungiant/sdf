@@ -377,5 +377,5 @@ This software is licensed under the **[MIT License][license]**; you may not use 
 
 [travis]: https://travis-ci.org/sungiant/sdf
 [license]: https://raw.githubusercontent.com/sungiant/sdf/master/LICENSE
-[realtime]: https://github.com/sungiant/sge/tree/dev2/examples/ex03_staticsdf
+[realtime]: https://github.com/sungiant/sge/tree/dev2/examples/ex03_raymarching
 
